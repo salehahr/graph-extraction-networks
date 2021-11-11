@@ -1,6 +1,8 @@
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 
-from tools.image import normalize_mask
+from tools.image import normalize_mask, colour_codes, draw_circles
 
 
 def plot_img(img, ax=None, cmap=None):
@@ -81,23 +83,44 @@ def plot_validation_results(validation_generator, results, batch_id=0):
     plt.show()
 
 
-def plot_sample(images, title=''):
-    for i, img in enumerate(images):
+def plot_sample(images: dict, title=''):
+    for i, (label, img) in enumerate(images.items()):
         plt.subplot(230 + i + 1)
 
         cmap = 'gray' if img.shape[2] == 1 else None
         plot_img(img, cmap=cmap)
+        plt.title(label)
     plt.suptitle(title)
     plt.show()
 
 
-def plot_generated_images(iterator, title='', cmap=None):
+def plot_generated_images(iterator, title: str = '', cmap=None):
+    base_imgs = []
     for i in range(4):
         plt.subplot(220 + 1 + i)
         batch = iterator.next()
         image = batch[0].astype('uint8')
 
+        base_imgs.append(image)
         plot_img(image, cmap=cmap)
 
     plt.suptitle(title)
     plt.show()
+
+    return base_imgs
+
+
+def plot_classifier_images(output_iterators, base_imgs):
+    for k, output_iter in output_iterators.items():
+        for i in range(4):
+            plt.subplot(220 + 1 + i)
+            batch = output_iter.next()
+            out_matrix = np.round(batch[0].squeeze()).astype('uint8')
+
+            base_img = cv2.cvtColor(base_imgs[i], cv2.COLOR_GRAY2BGR).astype(np.uint8)
+            out_image = draw_circles(base_img, out_matrix, colour_codes[k])
+            out_image = cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB)
+            plot_img(out_image)
+
+        plt.suptitle(k)
+        plt.show()
