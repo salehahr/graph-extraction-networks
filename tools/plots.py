@@ -1,62 +1,6 @@
-import cv2
-import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
 
 from tools.image import normalize_mask
-
-
-def plot_graph_on_img(image: np.ndarray, pos: np.ndarray, adjacency: np.ndarray):
-    img = image.copy()
-    if len(img.shape) == 2:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    adjacency_matrix = np.uint8(adjacency.copy())
-    positions = pos.copy()
-    pos_list = []
-    for i in range(len(positions)):
-        pos_list.append([positions[i][0], img.shape[0] - positions[i][1]])
-    p = dict(enumerate(pos_list, 0))
-
-    graph = nx.from_numpy_matrix(adjacency_matrix)
-    nx.set_node_attributes(graph, p, 'pos')
-
-    y_lim, x_lim = img.shape[:-1]
-    extent = 0, x_lim, 0, y_lim
-
-    fig = plt.figure(frameon=False, figsize=(20, 20))
-    plt.imshow(img, extent=extent, interpolation='nearest')
-    nx.draw(graph, pos=p, node_size=50, edge_color='g', width=3, node_color='r')
-
-    plt.show()
-
-    return fig
-
-
-def plot_nodes_on_img(image: np.ndarray, pos: np.ndarray, node_thick: int):
-    img = image.copy()
-    print(img)
-    if len(img.shape) == 2:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    # positions = pos.astype(int)
-    positions = pos
-    for i in range(len(positions)):
-        cv2.circle(img, (positions[i][0], positions[i][1]), 0, (255, 0, 0), node_thick)
-    y_lim, x_lim = img.shape[:-1]
-    extent = 0, x_lim, 0, y_lim
-    plt.figure(frameon=False, figsize=(20, 20))
-    plt.imshow(img, extent=extent, interpolation='nearest')
-    plt.show()
-    return img
-
-
-def get_rgb_from_bgr(img):
-    """ Gets RGB image for matplotlib plots. """
-    if img.max() < 1:
-        img = (img * 255).astype('uint8')
-    else:
-        img = img.astype('uint8')
-    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
 def plot_img(img, ax=None, cmap=None):
@@ -134,4 +78,26 @@ def plot_validation_results(validation_generator, results, batch_id=0):
     axes[0, 1].set_title('Filtered')
     axes[0, 3].set_title('Skeletonised')
 
+    plt.show()
+
+
+def plot_sample(images, title=''):
+    for i, img in enumerate(images):
+        plt.subplot(230 + i + 1)
+
+        cmap = 'gray' if img.shape[2] == 1 else None
+        plot_img(img, cmap=cmap)
+    plt.suptitle(title)
+    plt.show()
+
+
+def plot_generated_images(iterator, title='', cmap=None):
+    for i in range(4):
+        plt.subplot(220 + 1 + i)
+        batch = iterator.next()
+        image = batch[0].astype('uint8')
+
+        plot_img(image, cmap=cmap)
+
+    plt.suptitle(title)
     plt.show()
