@@ -3,7 +3,7 @@ import os
 from tools.files import get_sorted_imgs
 
 # user input
-img_length = 512
+img_length = 256
 img_channels = 3
 output_channels = 2
 
