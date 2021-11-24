@@ -40,11 +40,14 @@ def normalize_mask(mask):
 
 
 def generate_outputs(graph, dim: int) -> dict:
+    """
+    Generates output matrices of the graph's node attributes.
+    """
     matr_node_pos = np.zeros((dim, dim, 1)).astype(np.uint8)
     matr_node_degrees = np.zeros((dim, dim, 1)).astype(np.uint8)
     matr_node_types = np.zeros((dim, dim, 1)).astype(np.uint8)
 
-    for i, (row, col) in enumerate(graph.positions):
+    for i, (col, row) in enumerate(graph.positions):
         matr_node_pos[row][col] = 1
         matr_node_degrees[row][col] = graph.num_node_neighbours[i]
         matr_node_types[row][col] = graph.node_types[i]
@@ -84,7 +87,7 @@ def draw_circles(base_img: np.ndarray, classifier_matrix: np.ndarray,
 
     for val in unique_vals:
         positions = np.argwhere(classifier_matrix == val)
-        for xy in positions:
-            cv2.circle(img, tuple(xy), marker_size, colour_list[val], -1)
+        for (y, x) in positions:
+            cv2.circle(img, (x, y), marker_size, colour_list[val], -1)
 
     return img
