@@ -2,7 +2,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tools.image import normalize_mask, colour_codes, draw_circles
+from tools.image import normalize_mask, colour_codes, draw_circles, classifier_preview
 
 
 def plot_img(img, ax=None, cmap=None):
@@ -18,24 +18,25 @@ def plot_img(img, ax=None, cmap=None):
 
 def plot_sample_from_train_generator(training_generator, batch_id=0):
     batch_size = training_generator.batch_size
-    x, y = training_generator.__getitem__(batch_id)
+    x, y = training_generator[batch_id]
 
     plt.figure()
     fig, axes = plt.subplots(batch_size, 1 + training_generator.n_classes)
 
     for i in range(batch_size):
-        input_img = x[i, :, :, :]
-        filtered_img = y[0][i, :, :, 0]
-        skeletonised_img = y[1][i, :, :, 0]
+        input_img = np.float32(x[i, :, :, :])
+        plot_img(input_img, axes[i, 0], cmap='gray')
 
-        plot_img(input_img, axes[i, 0])
+        output_matrices = {k: y[ii][i, :, :, 0] for ii, k in enumerate(['node_pos', 'degrees', 'node_types'])}
+        output_images = classifier_preview(output_matrices, input_img * 255)
+        plot_img(output_images['node_pos'], axes[i, 1],)
+        plot_img(output_images['degrees'], axes[i, 2])
+        plot_img(output_images['node_types'], axes[i, 3])
 
-        plot_img(filtered_img, axes[i, 1], cmap='gray')
-        plot_img(skeletonised_img, axes[i, 2], cmap='gray')
-
-    axes[0, 0].set_title('Input')
-    axes[0, 1].set_title('Output 1')
-    axes[0, 2].set_title('Output 2')
+    axes[0, 0].set_title('Skel')
+    axes[0, 1].set_title('Node pos')
+    axes[0, 2].set_title('Node degrees')
+    axes[0, 3].set_title('Node types')
 
     plt.show()
 

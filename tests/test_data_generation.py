@@ -8,6 +8,7 @@ from keras.preprocessing.image import img_to_array
 from keras.preprocessing.image import ImageDataGenerator
 
 from tools.PolyGraph import PolyGraph
+from tools.data import get_skeletonised_ds, get_next_filepaths_from_ds
 from tools.files import get_random_video_path, get_random_image
 from tools.image import generate_outputs, classifier_preview
 from tools.plots import plot_sample, plot_generated_images, plot_classifier_images
@@ -15,10 +16,9 @@ from tools.plots import plot_sample, plot_generated_images, plot_classifier_imag
 img_length = 256
 base_path = f'/graphics/scratch/schuelej/sar/data/{img_length}'
 video_path = get_random_video_path(base_path)
-data_path = '/graphics/scratch/schuelej/sar/data/256/GRK008/cropped'
 
 
-class TestDataGeneration(unittest.TestCase):
+class TestDataAugmentation(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         img_name = get_random_image(video_path)
@@ -91,3 +91,35 @@ class TestDataGeneration(unittest.TestCase):
         base_imgs = plot_generated_images(in_iter, 'input: skeleton', cmap='gray')
 
         plot_classifier_images(classifier_iterators, base_imgs)
+
+
+class TestDataGeneration(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        # small dataset with 100 images
+        cls.ds = get_skeletonised_ds(base_path, shuffle=True, seed=13).take(100)
+
+    def test_split_data(self):
+        validation_fraction = 0.1
+        num_labels = len(self.ds)
+        num_validation = int(validation_fraction * num_labels)
+        num_train = num_labels - num_validation
+
+        train_fp = self.ds.take(num_train)
+        val_fp = self.ds.skip(num_train)
+
+        self.assertEqual(len(self.ds), len(train_fp) + len(val_fp))
+
+    def test_get_filepaths(self):
+        for i in range(3):
+            fp, graph_fp = get_next_filepaths_from_ds(self.ds)
+            self.assertTrue(os.path.isfile(fp))
+            self.assertTrue(os.path.isfile(graph_fp))
+
+    def test_get_batch_filepaths(self):
+        batch_size = 3
+        filepaths = [get_next_filepaths_from_ds(self.ds) for i in range(batch_size)]
+        skel_fps, graph_fps = zip(*filepaths)
+
+        print(skel_fps)
+        print(graph_fps)

@@ -2,6 +2,12 @@ from keras.preprocessing.image import ImageDataGenerator
 from tools.image import normalize_mask
 import skimage.io as io
 import os
+import skimage.io as io
+
+from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.data import Dataset
+
+from tools.image import normalize_mask, classifier_preview
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -66,8 +72,15 @@ def save_results(
     for i, filt in enumerate(results_filtered):
         binary_img = normalize_mask(results_skeleton[i, :, :, 0])
 
-        img_filt = (filt * 255).astype('uint8')
-        img_skel = (binary_img * 255).astype('uint8')
+def get_skeletonised_ds(data_path: str, shuffle: bool, seed: int) -> Dataset:
+    skeletonised_files_glob = [
+        os.path.join(data_path, '**/skeleton/*.png'),
+        os.path.join(data_path, '**/**/skeleton/*.png'),
+        ]
+    return Dataset.list_files(skeletonised_files_glob, shuffle=shuffle, seed=seed)
 
-        io.imsave(os.path.join(save_path, f"{i:d}_predict_filt.png"), img_filt)
-        io.imsave(os.path.join(save_path, f"{i:d}_predict_skel.png"), img_skel)
+
+def get_next_filepaths_from_ds(dataset: Dataset):
+    skel_fp = next(iter(dataset)).numpy().decode("utf-8")
+    graph_fp = skel_fp.replace('skeleton', 'graphs').replace('.png', '.json')
+    return skel_fp, graph_fp

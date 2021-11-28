@@ -4,7 +4,7 @@ import datetime
 import config
 from tools.data import save_results
 
-from tools.generator3 import DataGenerator, TestType
+from tools.generator import DataGenerator, TestType
 from tools.plots import plot_sample_from_train_generator, plot_validation_results
 
 
@@ -16,8 +16,8 @@ if __name__ == '__main__':
     conf = config.Config()
 
     # generate data
-    training_generator = DataGenerator(conf, TestType.TRAINING)
-    validation_generator = DataGenerator(conf, TestType.VALIDATION)
+    training_generator = DataGenerator(conf, TestType.TRAINING, to_fit=True)
+    validation_generator = DataGenerator(conf, TestType.VALIDATION, to_fit=False)
 
     plot_sample_from_train_generator(training_generator)
 
