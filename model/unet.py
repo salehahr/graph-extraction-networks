@@ -47,9 +47,10 @@ class UNet(Model):
         conv9 = double_conv(up9, n_filters * 1)  # 512x512x64
 
         # define output layer
-        output_filtered = single_conv(conv9, 1, 1, name='filtered', activation='linear')
-        output_skeleton = single_conv(conv9, 1, 1, name='skeleton', activation='sigmoid')
-        output = [output_filtered, output_skeleton]
+        node_pos = single_conv(conv9, 1, 1, name='node_pos', activation='relu')
+        degrees = single_conv(conv9, 1, 1, name='degrees', activation='relu')
+        node_types = single_conv(conv9, 1, 1, name='node_types', activation='relu')
+        output = [node_pos, degrees, node_types]
 
         # initialize Keras Model with defined above input and output layers
         super(UNet, self).__init__(inputs=input, outputs=output)
@@ -60,8 +61,10 @@ class UNet(Model):
 
     def build(self):
         self.compile(optimizer=Adam(),
-                     loss={'filtered': 'mean_squared_error',
-                           'skeleton': 'binary_crossentropy'},
+                     loss={'node_pos': 'binary_crossentropy',
+                           'degrees': 'categorical_crossentropy',
+                           'node_types': 'categorical_crossentropy',
+                           },
                      metrics=["accuracy"])
         self.summary()
 

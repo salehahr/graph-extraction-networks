@@ -22,7 +22,8 @@ if __name__ == '__main__':
     plot_sample_from_train_generator(training_generator)
 
     # build model
-    pretrained_weights = weights_path if os.path.isfile(weights_path) else None
+    # pretrained_weights = weights_path if os.path.isfile(weights_path) else None
+    pretrained_weights = None
 
     from model.unet import UNet
     unet = UNet(input_size=(*conf.img_dims, conf.img_channels),
