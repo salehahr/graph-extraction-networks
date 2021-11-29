@@ -1,7 +1,7 @@
 import json
 
-import numpy as np
 import networkx as nx
+import numpy as np
 
 
 class PolyGraph(nx.Graph):
@@ -15,8 +15,8 @@ class PolyGraph(nx.Graph):
 
     @classmethod
     def load(cls, filepath: str) -> nx.Graph:
-        """ Loads a graph from filepath. """
-        with open(filepath, 'r') as f:
+        """Loads a graph from filepath."""
+        with open(filepath, "r") as f:
             data_dict = json.load(f)
             graph = nx.node_link_graph(data_dict)
         return cls(graph)
@@ -24,7 +24,7 @@ class PolyGraph(nx.Graph):
     # properties for node extraction NN
     @property
     def positions(self) -> list:
-        return list(nx.get_node_attributes(self, 'pos').values())
+        return list(nx.get_node_attributes(self, "pos").values())
 
     @property
     def num_node_neighbours(self) -> list:
@@ -32,7 +32,7 @@ class PolyGraph(nx.Graph):
 
     @property
     def node_types(self) -> list:
-        orig_list = list(nx.get_node_attributes(self, 'type').values())
+        orig_list = list(nx.get_node_attributes(self, "type").values())
         # change zeros to four
         return [4 if i == 0 else i for i in orig_list]
 
@@ -43,23 +43,28 @@ class PolyGraph(nx.Graph):
 
     @property
     def adj_matrix(self) -> np.ndarray:
-        return np.hstack(self.positions_vector,
-                         nx.convert_matrix.to_numpy_array(self))
+        return np.hstack(self.positions_vector, nx.convert_matrix.to_numpy_array(self))
 
     @property
     def length_matrix(self) -> np.ndarray:
-        return np.hstack(np.zeros(self.positions_vector.shape),
-                         nx.attr_matrix(self, edge_attr="length")[0])
+        return np.hstack(
+            np.zeros(self.positions_vector.shape),
+            nx.attr_matrix(self, edge_attr="length")[0],
+        )
 
     @property
     def coeff3_matrix(self) -> np.ndarray:
-        return np.hstack(np.zeros(self.positions_vector.shape),
-                         nx.attr_matrix(self, edge_attr="deg3")[0])
+        return np.hstack(
+            np.zeros(self.positions_vector.shape),
+            nx.attr_matrix(self, edge_attr="deg3")[0],
+        )
 
     @property
     def coeff2_matrix(self) -> np.ndarray:
-        return np.hstack(np.zeros(self.positions_vector.shape),
-                         nx.attr_matrix(self, edge_attr="deg3")[0])
+        return np.hstack(
+            np.zeros(self.positions_vector.shape),
+            nx.attr_matrix(self, edge_attr="deg3")[0],
+        )
 
     def stacked_adj_matrix(self) -> np.ndarray:
         num_nodes = len(self)

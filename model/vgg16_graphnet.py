@@ -1,32 +1,26 @@
-#https://github.com/fchollet/deep-learning-models/blob/master/vgg16.py
+# https://github.com/fchollet/deep-learning-models/blob/master/vgg16.py
 # -*- coding: utf-8 -*-
-'''VGG16 model for Keras.
+"""VGG16 model for Keras.
 # Reference:
 - [Very Deep Convolutional Networks for Large-Scale Image Recognition](https://arxiv.org/abs/1409.1556)
-'''
+"""
 from __future__ import print_function
 
-import numpy as np
 import warnings
 
-from tensorflow.keras.models import Model
-from keras.layers import Flatten
-from keras.layers import Dense
-from tensorflow.keras.layers import Input
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import MaxPooling2D
-from keras.layers import GlobalMaxPooling1D
-from tensorflow.keras.layers import GlobalMaxPooling2D
-from tensorflow.keras.optimizers import *
-from keras.layers import GlobalAveragePooling2D
-from keras.preprocessing import image
-#from keras.utils import layer_utils
-from keras.utils.data_utils import get_file
-from keras.applications.imagenet_utils import decode_predictions
-from keras.applications.imagenet_utils import preprocess_input
+import numpy as np
+from keras.applications.imagenet_utils import decode_predictions, preprocess_input
 from keras.engine.topology import get_source_inputs
-from model.utils import callback
+from keras.layers import Dense, Flatten, GlobalAveragePooling2D, GlobalMaxPooling1D
+from keras.preprocessing import image
 
+# from keras.utils import layer_utils
+from keras.utils.data_utils import get_file
+from tensorflow.keras.layers import Conv2D, GlobalMaxPooling2D, Input, MaxPooling2D
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import *
+
+from model.utils import callback
 
 
 class GraphNet_vgg16(Model):
@@ -39,15 +33,14 @@ class GraphNet_vgg16(Model):
     The model and the weights are compatible with both
     TensorFlow and Theano. The data format
     convention used by the model is the one
-   """
-    def __init__(self,
-        input_size= [256, 256,2],
-        pretrained_weights = None,
-        max_nr_nodes =128
-        ):
+    """
 
-        self.input_size = input_size,
-        self.pretrained_weights = pretrained_weights,
+    def __init__(
+        self, input_size=[256, 256, 2], pretrained_weights=None, max_nr_nodes=128
+    ):
+
+        self.input_size = (input_size,)
+        self.pretrained_weights = (pretrained_weights,)
         self.max_nr_nodes = max_nr_nodes
 
         # dimensions of adjacency matrix
@@ -55,35 +48,61 @@ class GraphNet_vgg16(Model):
 
         # Block 1
         input = Input(shape=input_size, name="input_image")
-        x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(input)
-        x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+        x = Conv2D(64, (3, 3), activation="relu", padding="same", name="block1_conv1")(
+            input
+        )
+        x = Conv2D(64, (3, 3), activation="relu", padding="same", name="block1_conv2")(
+            x
+        )
+        x = MaxPooling2D((2, 2), strides=(2, 2), name="block1_pool")(x)
 
         # Block 2
-        x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-        x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+        x = Conv2D(128, (3, 3), activation="relu", padding="same", name="block2_conv1")(
+            x
+        )
+        x = Conv2D(128, (3, 3), activation="relu", padding="same", name="block2_conv2")(
+            x
+        )
+        x = MaxPooling2D((2, 2), strides=(2, 2), name="block2_pool")(x)
 
         # Block 3
-        x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1')(x)
-        x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2')(x)
-        x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
+        x = Conv2D(256, (3, 3), activation="relu", padding="same", name="block3_conv1")(
+            x
+        )
+        x = Conv2D(256, (3, 3), activation="relu", padding="same", name="block3_conv2")(
+            x
+        )
+        x = Conv2D(256, (3, 3), activation="relu", padding="same", name="block3_conv3")(
+            x
+        )
+        x = MaxPooling2D((2, 2), strides=(2, 2), name="block3_pool")(x)
 
         # Block 4
-        x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1')(x)
-        x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
-        x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
+        x = Conv2D(512, (3, 3), activation="relu", padding="same", name="block4_conv1")(
+            x
+        )
+        x = Conv2D(512, (3, 3), activation="relu", padding="same", name="block4_conv2")(
+            x
+        )
+        x = Conv2D(512, (3, 3), activation="relu", padding="same", name="block4_conv3")(
+            x
+        )
+        x = MaxPooling2D((2, 2), strides=(2, 2), name="block4_pool")(x)
 
         # Block 5
-        x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1')(x)
-        x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2')(x)
-        x = Conv2D(adj_dim, (3, 3), activation='sigmoid', padding='same', name='block5_conv3')(x)
-        #x = MaxPooling2D(,(2, 2), strides=(2, 2), name='block5_pool')(x)
+        x = Conv2D(512, (3, 3), activation="relu", padding="same", name="block5_conv1")(
+            x
+        )
+        x = Conv2D(512, (3, 3), activation="relu", padding="same", name="block5_conv2")(
+            x
+        )
+        x = Conv2D(
+            adj_dim, (3, 3), activation="sigmoid", padding="same", name="block5_conv3"
+        )(x)
+        # x = MaxPooling2D(,(2, 2), strides=(2, 2), name='block5_pool')(x)
 
         output = GlobalMaxPooling2D(data_format="channels_last")(x)
-        #model = Model(inputs, x, name='graph_vgg16')
+        # model = Model(inputs, x, name='graph_vgg16')
 
         # initialize Keras Model with defined above input and output layers
         super(GraphNet_vgg16, self).__init__(inputs=input, outputs=output)
@@ -101,7 +120,6 @@ class GraphNet_vgg16(Model):
     @staticmethod
     def checkpoint(checkpoint_callback_name):
         return callback(checkpoint_callback_name)
-
 
 
 # TODO: FIX SAVING MODEL: AT THIS POINT, ONLY SAVING MODEL WEIGHTS IS AVAILBILE

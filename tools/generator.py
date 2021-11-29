@@ -1,13 +1,12 @@
+from enum import Enum, unique
+
 import numpy as np
-
+from keras.preprocessing.image import img_to_array, load_img
 from tensorflow.keras.utils import Sequence
-from keras.preprocessing.image import load_img, img_to_array
 
-from tools.PolyGraph import PolyGraph
 from tools.data import get_next_filepaths_from_ds
 from tools.image import generate_outputs
-
-from enum import Enum, unique
+from tools.PolyGraph import PolyGraph
 
 
 @unique
@@ -21,15 +20,18 @@ class DataGenerator(Sequence):
     Sequence based data generator. Suitable for building data generator for training and prediction.
     """
 
-    def __init__(self, config, test_type: TestType,
-                 to_fit=True):
+    def __init__(self, config, test_type: TestType, to_fit=True):
         # ids
-        self.num_data = config.num_train if test_type is TestType.TRAINING else \
-            config.num_validation
+        self.num_data = (
+            config.num_train
+            if test_type is TestType.TRAINING
+            else config.num_validation
+        )
 
         # input
-        self.ds = config.train_ds if test_type is TestType.TRAINING else \
-            config.validation_ds
+        self.ds = (
+            config.train_ds if test_type is TestType.TRAINING else config.validation_ds
+        )
 
         # dimensions
         self.batch_size = config.batch_size
@@ -53,7 +55,9 @@ class DataGenerator(Sequence):
         """
         # assert i < self.__len__()
 
-        filepaths = [get_next_filepaths_from_ds(self.ds) for _ in range(self.batch_size)]
+        filepaths = [
+            get_next_filepaths_from_ds(self.ds) for _ in range(self.batch_size)
+        ]
         skel_fps, graph_fps = zip(*filepaths)
 
         skel_imgs = self._generate_x_tensor(skel_fps)
@@ -68,7 +72,9 @@ class DataGenerator(Sequence):
         x_tensor = np.empty((self.batch_size, *self.img_dims, self.n_channels))
 
         for i, fp in enumerate(skel_fps):
-            x_tensor[i, :, :, 0] = img_to_array(load_img(fp, grayscale=True), dtype=np.float32).squeeze()
+            x_tensor[i, :, :, 0] = img_to_array(
+                load_img(fp, grayscale=True), dtype=np.float32
+            ).squeeze()
 
         return x_tensor / np.float32(255)
 
@@ -81,8 +87,8 @@ class DataGenerator(Sequence):
             graph = PolyGraph.load(fp)
             output_matrices = generate_outputs(graph, self.img_dims[0])
 
-            y_node_pos[i, :, :, 0] = output_matrices['node_pos'].squeeze()
-            y_degrees[i, :, :, 0] = output_matrices['degrees'].squeeze()
-            y_node_types[i, :, :, 0] = output_matrices['node_types'].squeeze()
+            y_node_pos[i, :, :, 0] = output_matrices["node_pos"].squeeze()
+            y_degrees[i, :, :, 0] = output_matrices["degrees"].squeeze()
+            y_node_types[i, :, :, 0] = output_matrices["node_types"].squeeze()
 
         return y_node_pos, y_degrees, y_node_types

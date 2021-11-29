@@ -10,27 +10,27 @@ bgr_red = (0, 0, 255)
 bgr_lilac = (189, 130, 188)
 bgr_yellow = (0, 255, 255)
 
-degree_colours = [None,
-                  bgr_white,  # one neighbour
-                  bgr_green,  # helper
-                  bgr_red,  # three neighbours
-                  bgr_blue,
-                  bgr_lilac,
-                  bgr_yellow]
+degree_colours = [
+    None,
+    bgr_white,  # one neighbour
+    bgr_green,  # helper
+    bgr_red,  # three neighbours
+    bgr_blue,
+    bgr_lilac,
+    bgr_yellow,
+]
 
-node_type_colours = [None,
-                     bgr_blue,
-                     bgr_red,
-                     bgr_black,
-                     bgr_yellow]
+node_type_colours = [None, bgr_blue, bgr_red, bgr_black, bgr_yellow]
 
-colour_codes = {'node_pos': [None, bgr_white],
-                'degrees': degree_colours,
-                'node_types': node_type_colours}
+colour_codes = {
+    "node_pos": [None, bgr_white],
+    "degrees": degree_colours,
+    "node_types": node_type_colours,
+}
 
 
 def normalize_mask(mask):
-    """ Mask Normalisation
+    """Mask Normalisation
     Function that returns normalised mask
     Each pixel is either 0 or 1
     """
@@ -52,9 +52,11 @@ def generate_outputs(graph, dim: int) -> dict:
         matr_node_degrees[row][col] = graph.num_node_neighbours[i]
         matr_node_types[row][col] = graph.node_types[i]
 
-    return {'node_pos': matr_node_pos,
-            'degrees': matr_node_degrees,
-            'node_types': matr_node_types}
+    return {
+        "node_pos": matr_node_pos,
+        "degrees": matr_node_degrees,
+        "node_types": matr_node_types,
+    }
 
 
 def classifier_preview(output_matrices: dict, img_skel: np.ndarray) -> dict:
@@ -64,19 +66,22 @@ def classifier_preview(output_matrices: dict, img_skel: np.ndarray) -> dict:
     the corresponding visualisation.
     """
     base_img = cv2.cvtColor(img_skel, cv2.COLOR_GRAY2BGR).astype(np.uint8)
-    data_dict = {k: {'matrix': v.squeeze(),
-                     'colours': colour_codes[k]} for k, v in output_matrices.items()}
+    data_dict = {
+        k: {"matrix": v.squeeze(), "colours": colour_codes[k]}
+        for k, v in output_matrices.items()
+    }
 
     debug_images = {}
     for k, v in data_dict.items():
-        img = draw_circles(base_img, v['matrix'], v['colours'])
+        img = draw_circles(base_img, v["matrix"], v["colours"])
         debug_images[k] = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     return debug_images
 
 
-def draw_circles(base_img: np.ndarray, classifier_matrix: np.ndarray,
-                 colour_list: list) -> np.ndarray:
+def draw_circles(
+    base_img: np.ndarray, classifier_matrix: np.ndarray, colour_list: list
+) -> np.ndarray:
     """
     Draws circles on the image colour coded according to the unique values
     in the classifier matrix.

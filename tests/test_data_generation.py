@@ -1,124 +1,61 @@
-import os.path
 import unittest
 
-import numpy as np
-
-from keras.preprocessing.image import load_img
-from keras.preprocessing.image import img_to_array
-from keras.preprocessing.image import ImageDataGenerator
-
-from tools.PolyGraph import PolyGraph
-from tools.data import get_skeletonised_ds, get_next_filepaths_from_ds
-from tools.files import get_random_video_path, get_random_image
-from tools.image import generate_outputs, classifier_preview
-from tools.plots import plot_sample, plot_generated_images, plot_classifier_images
+from tools.data import get_next_filepaths_from_ds, get_skeletonised_ds
+from tools.files import get_random_video_path
 
 img_length = 256
-base_path = f'/graphics/scratch/schuelej/sar/data/{img_length}'
+base_path = f"/graphics/scratch/schuelej/sar/data/{img_length}"
 video_path = get_random_video_path(base_path)
-
-
-class TestDataAugmentation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        img_name = get_random_image(video_path)
-        print(f'Video path: {video_path}')
-        print(f'Image: {img_name}')
-
-        # initialise filepaths
-        img_cropped_fp = os.path.join(video_path, f'cropped/{img_name}')
-        img_masked_fp = img_cropped_fp.replace('cropped', 'masked')
-        img_skeletonised_fp = img_cropped_fp.replace('cropped', 'skeleton')
-        graph_fp = img_cropped_fp.replace('cropped', 'graphs').replace('.png', '.json')
-
-        # load images and graph
-        img_cropped = img_to_array(load_img(img_cropped_fp), dtype=np.uint8)
-        img_masked = img_to_array(load_img(img_masked_fp, grayscale=True), dtype=np.uint8)
-        img_skeletonised = img_to_array(load_img(img_skeletonised_fp, grayscale=True), dtype=np.uint8)
-        graph = PolyGraph.load(graph_fp)
-
-        # generate masks
-        output_matrices = generate_outputs(graph, img_length)
-        output_img = classifier_preview(output_matrices, img_skeletonised)
-
-        # only one sample in batch
-        cls.samples_skeletonised = np.expand_dims(img_skeletonised, axis=0)
-        cls.samples_node_pos = np.expand_dims(output_matrices['node_pos'], axis=0)
-        cls.samples_degrees = np.expand_dims(output_matrices['degrees'], axis=0)
-        cls.samples_node_types = np.expand_dims(output_matrices['node_types'], axis=0)
-
-        cls.plot_title = os.path.relpath(img_cropped_fp.replace('cropped/', ''),
-                                         start=base_path)
-        sample_images = {'cropped': img_cropped,
-                         'masked': img_masked,
-                         'skeleton': img_skeletonised,
-                         'node_pos': output_img['node_pos'],
-                         'degrees': output_img['degrees'],
-                         'node_types': output_img['node_types'],
-                         }
-        plot_sample(sample_images, cls.plot_title)
-
-    def test_transformed_imgs_and_mask(self):
-        data_gen_args = dict(rotation_range=90,
-                             horizontal_flip=True,
-                             vertical_flip=True)
-
-        image_datagen = ImageDataGenerator(**data_gen_args)
-        mask_datagen = ImageDataGenerator(**data_gen_args)
-
-        # Provide the same seed and keyword arguments to the fit and flow methods
-        seed = 1
-        # image_datagen.fit(images, augment=True, seed=seed)
-        # mask_datagen.fit(masks, augment=True, seed=seed)
-
-        in_iter = image_datagen.flow(self.samples_skeletonised,
-                                     batch_size=1,
-                                     seed=seed)
-        out_node_pos_iter = mask_datagen.flow(self.samples_node_pos,
-                                              batch_size=1,
-                                              seed=seed)
-        out_degrees_iter = mask_datagen.flow(self.samples_degrees,
-                                             batch_size=1,
-                                             seed=seed)
-        out_node_types_iter = mask_datagen.flow(self.samples_node_types,
-                                             batch_size=1,
-                                             seed=seed)
-
-        classifier_iterators = {'node_pos': out_node_pos_iter,
-                                'degrees': out_degrees_iter,
-                                'node_types': out_node_types_iter}
-
-        base_imgs = plot_generated_images(in_iter, 'input: skeleton', cmap='gray')
-
-        plot_classifier_images(classifier_iterators, base_imgs)
 
 
 class TestDataGeneration(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        # small dataset with 100 images
-        cls.ds = get_skeletonised_ds(base_path, shuffle=True, seed=13).take(100)
+        # small dataset
+        cls.num_labels = 15
+        cls.batch_size = 3
+        cls.steps_per_epoch = int(cls.num_labels / cls.batch_size)
+
+        cls.ds = get_skeletonised_ds(base_path, shuffle=True, seed=13).take(
+            cls.num_labels
+        )
+        print(f"Using {cls.num_labels} images.")
+
+        cls.train_ds, cls.val_ds = cls.split_data()
+
+        # so that the iteration does not go beyond num_labels
+        cls.ds = list(cls.ds.as_numpy_iterator())
+        cls.train_ds = list(cls.train_ds.as_numpy_iterator())
+        cls.val_ds = list(cls.val_ds.as_numpy_iterator())
+
+    @classmethod
+    def split_data(cls):
+        validation_fraction = 0.1
+        num_validation = int(validation_fraction * cls.num_labels)
+        num_train = cls.num_labels - num_validation
+
+        train_ds = cls.ds.take(num_train)
+        val_ds = cls.ds.skip(num_train)
+
+        return train_ds, val_ds
 
     def test_split_data(self):
-        validation_fraction = 0.1
-        num_labels = len(self.ds)
-        num_validation = int(validation_fraction * num_labels)
-        num_train = num_labels - num_validation
+        self.assertEqual(len(self.ds), len(self.train_ds) + len(self.val_ds))
 
-        train_fp = self.ds.take(num_train)
-        val_fp = self.ds.skip(num_train)
-
-        self.assertEqual(len(self.ds), len(train_fp) + len(val_fp))
-
-    def test_get_filepaths(self):
-        for i in range(3):
-            fp, graph_fp = get_next_filepaths_from_ds(self.ds)
-            self.assertTrue(os.path.isfile(fp))
-            self.assertTrue(os.path.isfile(graph_fp))
+    # def test_get_filepaths(self):
+    #     num_val = len(self.val_ds)
+    #
+    #     print(f'Getting filepaths from validation DS with {num_val} files.')
+    #     for i in range(num_val * 2):
+    #         fp, graph_fp = get_next_filepaths_from_ds(self.val_ds)
+    #         print(fp)
+    #         self.assertTrue(os.path.isfile(fp))
+    #         self.assertTrue(os.path.isfile(graph_fp))
 
     def test_get_batch_filepaths(self):
-        batch_size = 3
-        filepaths = [get_next_filepaths_from_ds(self.ds) for i in range(batch_size)]
+        filepaths = [
+            get_next_filepaths_from_ds(self.ds) for i in range(self.batch_size)
+        ]
         skel_fps, graph_fps = zip(*filepaths)
 
         print(skel_fps)

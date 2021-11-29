@@ -2,7 +2,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tools.image import normalize_mask, colour_codes, draw_circles, classifier_preview
+from tools.image import classifier_preview, colour_codes, draw_circles, normalize_mask
 
 
 def plot_img(img, ax=None, cmap=None):
@@ -25,31 +25,26 @@ def plot_sample_from_train_generator(training_generator, batch_id=0):
 
     for i in range(batch_size):
         input_img = np.float32(x[i, :, :, :])
-        plot_img(input_img, axes[i, 0], cmap='gray')
+        plot_img(input_img, axes[i, 0], cmap="gray")
 
-        output_matrices = {k: y[ii][i, :, :, 0] for ii, k in enumerate(['node_pos', 'degrees', 'node_types'])}
+        output_matrices = {
+            k: y[ii][i, :, :, 0]
+            for ii, k in enumerate(["node_pos", "degrees", "node_types"])
+        }
         output_images = classifier_preview(output_matrices, input_img * 255)
-        plot_img(output_images['node_pos'], axes[i, 1],)
-        plot_img(output_images['degrees'], axes[i, 2])
-        plot_img(output_images['node_types'], axes[i, 3])
+        plot_img(
+            output_images["node_pos"],
+            axes[i, 1],
+        )
+        plot_img(output_images["degrees"], axes[i, 2])
+        plot_img(output_images["node_types"], axes[i, 3])
 
-    axes[0, 0].set_title('Skel')
-    axes[0, 1].set_title('Node pos')
-    axes[0, 2].set_title('Node degrees')
-    axes[0, 3].set_title('Node types')
+    axes[0, 0].set_title("Skel")
+    axes[0, 1].set_title("Node pos")
+    axes[0, 2].set_title("Node degrees")
+    axes[0, 3].set_title("Node types")
 
     plt.show()
-
-    # from tools.utilz_graph import tensor_2_adjmatrix, tensor_2_image_and_pos
-    #
-    # Tensor_sample = Tensor[batch_nr,]
-    # img, pos = tensor_2_image_and_pos(Tensor_sample)
-    # adj_matrix = tensor_2_adjmatrix(adj_vector = adj_vector[batch_nr, :],
-    #                                 networksize = training_generator.max_node_dim,
-    #                                 nr_nodes = len(pos))
-    #
-    # node_img = plot_nodes_on_img(img, pos, node_thick=6)
-    # fig = plot_graph_on_img(img, pos, adj_matrix)
 
 
 def plot_validation_results(validation_generator, results, batch_id=0):
@@ -64,43 +59,43 @@ def plot_validation_results(validation_generator, results, batch_id=0):
         filtered_img_true = y_true[0][i, :, :, 0]
         skeletonised_img_true = y_true[1][i, :, :, 0]
 
-        filtered_img_res = (results[0][i] * 255).astype('uint8')
+        filtered_img_res = (results[0][i] * 255).astype("uint8")
 
         binary_img = normalize_mask(results[1][i])
-        skeletonised_img_res = binary_img.astype('uint8')
+        skeletonised_img_res = binary_img.astype("uint8")
 
         plot_img(input_img, axes[i, 0])
 
-        plot_img(filtered_img_true, axes[i, 1], cmap='gray')
-        plot_img(skeletonised_img_true, axes[i, 3], cmap='gray')
+        plot_img(filtered_img_true, axes[i, 1], cmap="gray")
+        plot_img(skeletonised_img_true, axes[i, 3], cmap="gray")
 
-        plot_img(filtered_img_res, axes[i, 2], cmap='gray')
-        plot_img(skeletonised_img_res, axes[i, 4], cmap='gray')
+        plot_img(filtered_img_res, axes[i, 2], cmap="gray")
+        plot_img(skeletonised_img_res, axes[i, 4], cmap="gray")
 
-    axes[0, 0].set_title('Input')
-    axes[0, 1].set_title('Filtered')
-    axes[0, 3].set_title('Skeletonised')
+    axes[0, 0].set_title("Input")
+    axes[0, 1].set_title("Filtered")
+    axes[0, 3].set_title("Skeletonised")
 
     plt.show()
 
 
-def plot_sample(images: dict, title=''):
+def plot_sample(images: dict, title=""):
     for i, (label, img) in enumerate(images.items()):
         plt.subplot(230 + i + 1)
 
-        cmap = 'gray' if img.shape[2] == 1 else None
+        cmap = "gray" if img.shape[2] == 1 else None
         plot_img(img, cmap=cmap)
         plt.title(label)
     plt.suptitle(title)
     plt.show()
 
 
-def plot_generated_images(iterator, title: str = '', cmap=None):
+def plot_generated_images(iterator, title: str = "", cmap=None):
     base_imgs = []
     for i in range(4):
         plt.subplot(220 + 1 + i)
         batch = iterator.next()
-        image = batch[0].astype('uint8')
+        image = batch[0].astype("uint8")
 
         base_imgs.append(image)
         plot_img(image, cmap=cmap)
@@ -116,7 +111,7 @@ def plot_classifier_images(output_iterators, base_imgs):
         for i in range(4):
             plt.subplot(220 + 1 + i)
             batch = output_iter.next()
-            out_matrix = np.round(batch[0].squeeze()).astype('uint8')
+            out_matrix = np.round(batch[0].squeeze()).astype("uint8")
 
             base_img = cv2.cvtColor(base_imgs[i], cv2.COLOR_GRAY2BGR).astype(np.uint8)
             out_image = draw_circles(base_img, out_matrix, colour_codes[k])

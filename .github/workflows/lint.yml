@@ -1,0 +1,28 @@
+name: lint
+
+on:
+  push:
+    branches:
+      - master
+      - working
+  pull_request:
+    branches:
+      - master
+      - working
+
+jobs:
+  linting-black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install black
+        run: |
+          python -m pip install --upgrade pip
+          pip install black
+      - name: Check lint
+        run: |
+          black --check .

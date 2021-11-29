@@ -1,16 +1,20 @@
+from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import TensorBoard
-from model.utils import input_tensor, single_conv, double_conv, deconv, pooling, merge, callback
+
+from model.utils import (
+    callback,
+    deconv,
+    double_conv,
+    input_tensor,
+    merge,
+    pooling,
+    single_conv,
+)
 
 
 class UNet(Model):
-    def __init__(
-            self,
-            input_size,
-            n_filters,
-            pretrained_weights=None
-    ):
+    def __init__(self, input_size, n_filters, pretrained_weights=None):
         # define input layer
         input = input_tensor(input_size)  # 512x512x3
 
@@ -47,9 +51,9 @@ class UNet(Model):
         conv9 = double_conv(up9, n_filters * 1)  # 512x512x64
 
         # define output layer
-        node_pos = single_conv(conv9, 1, 1, name='node_pos', activation='relu')
-        degrees = single_conv(conv9, 1, 1, name='degrees', activation='relu')
-        node_types = single_conv(conv9, 1, 1, name='node_types', activation='relu')
+        node_pos = single_conv(conv9, 1, 1, name="node_pos", activation="relu")
+        degrees = single_conv(conv9, 1, 1, name="degrees", activation="relu")
+        node_types = single_conv(conv9, 1, 1, name="node_types", activation="relu")
         output = [node_pos, degrees, node_types]
 
         # initialize Keras Model with defined above input and output layers
@@ -60,12 +64,15 @@ class UNet(Model):
             self.load_weights(pretrained_weights)
 
     def build(self):
-        self.compile(optimizer=Adam(),
-                     loss={'node_pos': 'binary_crossentropy',
-                           'degrees': 'categorical_crossentropy',
-                           'node_types': 'categorical_crossentropy',
-                           },
-                     metrics=["accuracy"])
+        self.compile(
+            optimizer=Adam(),
+            loss={
+                "node_pos": "binary_crossentropy",
+                "degrees": "categorical_crossentropy",
+                "node_types": "categorical_crossentropy",
+            },
+            metrics=["accuracy"],
+        )
         self.summary()
 
     @staticmethod
