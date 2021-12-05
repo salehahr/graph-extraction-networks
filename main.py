@@ -1,9 +1,8 @@
 import datetime
 import os
 
-import config
+from tools import Config, DataGenerator, TestType
 from tools.data import save_results
-from tools.generator import DataGenerator, TestType
 from tools.plots import plot_sample_from_train_generator, plot_validation_results
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
@@ -13,11 +12,11 @@ log_dir = os.path.join(
 )
 
 if __name__ == "__main__":
-    conf = config.Config()
+    conf = Config()
 
     # generate data
-    training_generator = DataGenerator(conf, TestType.TRAINING, to_fit=True)
-    validation_generator = DataGenerator(conf, TestType.VALIDATION, to_fit=False)
+    training_generator = DataGenerator(conf, TestType.TRAINING)
+    validation_generator = DataGenerator(conf, TestType.VALIDATION)
 
     plot_sample_from_train_generator(training_generator)
 

@@ -75,6 +75,10 @@ def get_skeletonised_ds(data_path: str, shuffle: bool, seed: int) -> Dataset:
     return Dataset.list_files(skeletonised_files_glob, shuffle=shuffle, seed=seed)
 
 
+def ds_to_list(dataset: Dataset) -> list:
+    return [f.decode("utf-8") for f in dataset.as_numpy_iterator()]
+
+
 def get_next_filepaths_from_ds(dataset: Dataset):
     skel_fp = next(iter(dataset)).numpy().decode("utf-8")
     graph_fp = skel_fp.replace("skeleton", "graphs").replace(".png", ".json")

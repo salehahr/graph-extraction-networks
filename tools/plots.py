@@ -21,7 +21,7 @@ def plot_sample_from_train_generator(training_generator, batch_id=0):
     x, y = training_generator[batch_id]
 
     plt.figure()
-    fig, axes = plt.subplots(batch_size, 1 + training_generator.n_classes)
+    fig, axes = plt.subplots(batch_size, 1 + training_generator.output_channels)
 
     for i in range(batch_size):
         input_img = np.float32(x[i, :, :, :])
@@ -52,7 +52,7 @@ def plot_validation_results(validation_generator, results, batch_id=0):
     x, y_true = validation_generator.__getitem__(batch_id)
 
     plt.figure()
-    fig, axes = plt.subplots(batch_size, 1 + 2 * validation_generator.n_classes)
+    fig, axes = plt.subplots(batch_size, 1 + 2 * validation_generator.output_channels)
 
     for i in range(batch_size):
         input_img = x[i, :, :, :]
