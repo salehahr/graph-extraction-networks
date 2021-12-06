@@ -12,13 +12,13 @@ assert "tests" in cwd
 log_dir = os.path.join(cwd, "logs")
 
 
-class TestModel(unittest.TestCase):
+class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.weights = os.path.join(cwd, "weights.hdf5")
         cls.model = cls._init_model()
         cls.tensorboard = cls._init_tensorboard()
-        cls.weights = os.path.join(cwd, "weights.hdf5")
 
     @classmethod
     def _init_model(cls) -> UNet:
@@ -64,11 +64,29 @@ class TestModel(unittest.TestCase):
         for e in epochs:
             self.assertFalse(math.isnan(losses[e]))
 
+
+class TestTrainedModel(TestUntrainedModel):
+    @classmethod
+    def _init_model(cls) -> UNet:
+        unet = UNet(
+            input_size=(*cls.config.img_dims, cls.config.input_channels),
+            n_filters=64,
+            pretrained_weights=cls.weights,
+        )
+        unet.build()
+
+        return unet
+
     def test_predict(self):
         validation_ds = DataGenerator(self.config, TestType.VALIDATION)
 
         self.model.load_weights(self.weights)
 
         results = self.model.predict(x=validation_ds, verbose=1)
+
+        batch_id = 0
+        node_pos = results[0][batch_id]
+        degrees = results[1][batch_id]
+        node_types = results[2][batch_id]
 
         return
