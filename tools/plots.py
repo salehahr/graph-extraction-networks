@@ -1,11 +1,13 @@
+from typing import Optional
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tools.image import classifier_preview, colour_codes, draw_circles, normalize_mask
+from tools.image import classifier_preview, colour_enums, draw_circles, normalize_mask
 
 
-def plot_img(img, ax=None, cmap=None):
+def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
     if not ax:
         plt.imshow(img, cmap=cmap)
         plt.xticks([])
@@ -16,28 +18,29 @@ def plot_img(img, ax=None, cmap=None):
         ax.set_yticks([])
 
 
-def plot_sample_from_train_generator(training_generator, batch_id=0):
-    batch_size = training_generator.batch_size
-    x, y = training_generator[batch_id]
+def plot_training_sample(dataset, batch_id: int = 0):
+    batch_size = dataset.batch_size
+    skel_img, node_attrs = dataset[batch_id]
 
     plt.figure()
-    fig, axes = plt.subplots(batch_size, 1 + training_generator.output_channels)
+    fig, axes = plt.subplots(batch_size, 1 + dataset.output_channels)
 
-    for i in range(batch_size):
-        input_img = np.float32(x[i, :, :, :])
-        plot_img(input_img, axes[i, 0], cmap="gray")
+    for b in range(batch_size):
+        input_img = np.float32(skel_img[b, :, :, :])
+        plot_img(input_img, axes[b, 0], cmap="gray")
 
         output_matrices = {
-            k: y[ii][i, :, :, 0]
-            for ii, k in enumerate(["node_pos", "degrees", "node_types"])
+            attr: node_attrs[i][b, :, :, 0]
+            for i, attr in enumerate(["node_pos", "degrees", "node_types"])
         }
+
         output_images = classifier_preview(output_matrices, input_img * 255)
         plot_img(
             output_images["node_pos"],
-            axes[i, 1],
+            axes[b, 1],
         )
-        plot_img(output_images["degrees"], axes[i, 2])
-        plot_img(output_images["node_types"], axes[i, 3])
+        plot_img(output_images["degrees"], axes[b, 2])
+        plot_img(output_images["node_types"], axes[b, 3])
 
     axes[0, 0].set_title("Skel")
     axes[0, 1].set_title("Node pos")
@@ -114,7 +117,7 @@ def plot_classifier_images(output_iterators, base_imgs):
             out_matrix = np.round(batch[0].squeeze()).astype("uint8")
 
             base_img = cv2.cvtColor(base_imgs[i], cv2.COLOR_GRAY2BGR).astype(np.uint8)
-            out_image = draw_circles(base_img, out_matrix, colour_codes[k])
+            out_image = draw_circles(base_img, out_matrix, colour_enums[k])
             out_image = cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB)
             plot_img(out_image)
 

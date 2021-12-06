@@ -33,8 +33,8 @@ class PolyGraph(nx.Graph):
     @property
     def node_types(self) -> list:
         orig_list = list(nx.get_node_attributes(self, "type").values())
-        # change zeros to four
-        return [4 if i == 0 else i for i in orig_list]
+        # change zeros to threes
+        return [3 if i == 0 else i for i in orig_list]
 
     # properties for edge extraction NN
     @property

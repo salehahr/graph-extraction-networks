@@ -3,7 +3,7 @@ import os
 
 from tools import Config, DataGenerator, TestType
 from tools.data import save_results
-from tools.plots import plot_sample_from_train_generator, plot_validation_results
+from tools.plots import plot_training_sample, plot_validation_results
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
 weights_path = os.path.join(base_path, "unet_weight_model.hdf5")
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     training_generator = DataGenerator(conf, TestType.TRAINING)
     validation_generator = DataGenerator(conf, TestType.VALIDATION)
 
-    plot_sample_from_train_generator(training_generator)
+    plot_training_sample(training_generator)
 
     # build model
     # pretrained_weights = weights_path if os.path.isfile(weights_path) else None
