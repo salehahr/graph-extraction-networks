@@ -1,62 +1,64 @@
 import unittest
 
-from tools.data import get_next_filepaths_from_ds, get_skeletonised_ds
-from tools.files import get_random_video_path
+import numpy as np
 
-img_length = 256
-base_path = f"/graphics/scratch/schuelej/sar/data/{img_length}"
-video_path = get_random_video_path(base_path)
+from tools import Config, DataGenerator, TestType
+from tools.plots import plot_training_sample
 
 
 class TestDataGeneration(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        # small dataset
-        cls.num_labels = 15
-        cls.batch_size = 3
-        cls.steps_per_epoch = int(cls.num_labels / cls.batch_size)
+        cls.config = Config("test_config.yaml")
+        cls.training_data = DataGenerator(cls.config, TestType.TRAINING)
+        cls.validation_data = DataGenerator(cls.config, TestType.VALIDATION)
 
-        cls.ds = get_skeletonised_ds(base_path, shuffle=True, seed=13).take(
-            cls.num_labels
-        )
-        print(f"Using {cls.num_labels} images.")
+    def test_training_generator(self):
+        self.assertEqual(len(self.training_data), 9)
+        self._cycle_through_items(self.training_data)
 
-        cls.train_ds, cls.val_ds = cls.split_data()
+    def test_validation_generator(self):
+        self.assertEqual(len(self.validation_data), 1)
+        self._cycle_through_items(self.validation_data)
 
-        # so that the iteration does not go beyond num_labels
-        cls.ds = list(cls.ds.as_numpy_iterator())
-        cls.train_ds = list(cls.train_ds.as_numpy_iterator())
-        cls.val_ds = list(cls.val_ds.as_numpy_iterator())
+    def _cycle_through_items(self, dataset):
+        # one complete epoch: passes through all the data in the dataset
+        for i in range(len(dataset)):
+            self.assertIsNotNone(dataset[i])
 
-    @classmethod
-    def split_data(cls):
-        validation_fraction = 0.1
-        num_validation = int(validation_fraction * cls.num_labels)
-        num_train = cls.num_labels - num_validation
+    def test_plot_training_sample(self):
+        plot_training_sample(self.training_data)
 
-        train_ds = cls.ds.take(num_train)
-        val_ds = cls.ds.skip(num_train)
+    def test_input_data(self):
+        step_num = 0
+        batch_id = 0
+        x = self.validation_data[step_num][batch_id]
 
-        return train_ds, val_ds
+        is_normalised = np.max(x) <= 1
 
-    def test_split_data(self):
-        self.assertEqual(len(self.ds), len(self.train_ds) + len(self.val_ds))
+        self.assertTrue(is_normalised)
+        self.assertEqual(x.shape, (256, 256, 1))
+        self.assertEqual(x.dtype, np.float32)
 
-    # def test_get_filepaths(self):
-    #     num_val = len(self.val_ds)
-    #
-    #     print(f'Getting filepaths from validation DS with {num_val} files.')
-    #     for i in range(num_val * 2):
-    #         fp, graph_fp = get_next_filepaths_from_ds(self.val_ds)
-    #         print(fp)
-    #         self.assertTrue(os.path.isfile(fp))
-    #         self.assertTrue(os.path.isfile(graph_fp))
+    def test_output_data(self):
+        step_num = 0
+        batch_id = 0
+        _, y = self.training_data[step_num]
 
-    def test_get_batch_filepaths(self):
-        filepaths = [
-            get_next_filepaths_from_ds(self.ds) for i in range(self.batch_size)
-        ]
-        skel_fps, graph_fps = zip(*filepaths)
+        node_pos = y[0][batch_id]
+        self.assertEqual(node_pos.shape, (256, 256, 1))
+        self.assertEqual(node_pos.dtype, np.uint8)
+        self.assertEqual(np.min(node_pos), 0)
+        self.assertEqual(np.max(node_pos), 1)
 
-        print(skel_fps)
-        print(graph_fps)
+        node_degrees = y[1][batch_id]
+        self.assertEqual(node_degrees.shape, (256, 256, 1))
+        self.assertEqual(node_degrees.dtype, np.uint8)
+        self.assertEqual(np.min(node_pos), 0)
+        self.assertLessEqual(np.max(node_pos), 5)
+
+        node_types = y[2][batch_id]
+        self.assertEqual(node_types.shape, (256, 256, 1))
+        self.assertEqual(node_degrees.dtype, np.uint8)
+        self.assertEqual(np.min(node_pos), 0)
+        self.assertLessEqual(np.max(node_pos), 3)
