@@ -51,9 +51,9 @@ class UNet(Model):
         conv9 = double_conv(up9, n_filters * 1)  # 512x512x64
 
         # define output layer
-        node_pos = single_conv(conv9, 1, 1, name="node_pos", activation="relu")
-        degrees = single_conv(conv9, 1, 1, name="degrees", activation="relu")
-        node_types = single_conv(conv9, 1, 1, name="node_types", activation="relu")
+        node_pos = single_conv(conv9, 1, 1, name="node_pos", activation="sigmoid")
+        degrees = single_conv(conv9, 1, 1, name="degrees", activation="softmax")
+        node_types = single_conv(conv9, 1, 1, name="node_types", activation="softmax")
         output = [node_pos, degrees, node_types]
 
         # initialize Keras Model with defined above input and output layers
