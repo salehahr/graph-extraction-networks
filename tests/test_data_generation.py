@@ -3,10 +3,11 @@ import unittest
 import numpy as np
 
 from tools import Config, DataGenerator, TestType
+from tools.data import ds_to_list
 from tools.plots import plot_training_sample
 
 
-class TestDataGeneration(unittest.TestCase):
+class TestDataGenerator(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
@@ -62,3 +63,67 @@ class TestDataGeneration(unittest.TestCase):
         self.assertEqual(node_degrees.dtype, np.uint8)
         self.assertEqual(np.min(node_pos), 0)
         self.assertLessEqual(np.max(node_pos), 3)
+
+
+class TestDataset(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = Config("test_config.yaml")
+        assert cls.config.use_small_dataset is True
+        assert cls.config.max_files == 30
+
+        cls.ds = cls.config.dataset
+        cls.list_of_files = ds_to_list(cls.ds)
+
+        print(cls.list_of_files)
+
+    def test_two_takes(self):
+        ds1 = self.ds.take(self.config.num_validation)
+        ds2 = self.ds.take(self.config.num_validation)
+        ds3 = self.ds.skip(self.config.num_validation).take(self.config.num_validation)
+
+        list_files1 = ds_to_list(ds1)
+        list_files2 = ds_to_list(ds2)
+        list_files3 = ds_to_list(ds3)
+
+        print("1")
+        for fp in list_files1:
+            print(fp)
+            self.assertTrue(fp in self.list_of_files)
+
+        print("2")
+        for fp in list_files2:
+            print(fp)
+            self.assertTrue(fp in self.list_of_files)
+            self.assertTrue(fp in list_files1)
+
+        print("3")
+        for fp in list_files3:
+            print(fp)
+            self.assertTrue(fp in self.list_of_files)
+            self.assertFalse(fp in list_files2)
+
+    def test_train_and_val_ds(self):
+        train_ds = self.ds.take(self.config.num_train)
+        val_ds = self.ds.skip(self.config.num_train)
+
+        for fp in ds_to_list(train_ds):
+            self.assertTrue(fp in self.list_of_files)
+
+        for fp in ds_to_list(val_ds):
+            self.assertTrue(fp in self.list_of_files)
+
+    def test_simulate_epoch(self):
+        batch_size = 3
+        steps_per_epoch = int(len(self.ds) / batch_size)
+
+        for i in range(steps_per_epoch):
+            print(f"Batch {i}")
+
+            batch = self.ds.skip(i * batch_size).take(batch_size)
+
+            files = ds_to_list(batch)
+
+            for bid, fp in enumerate(files):
+                file_id = i * batch_size + bid
+                self.assertEqual(fp, self.list_of_files[file_id])

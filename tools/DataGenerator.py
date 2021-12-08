@@ -21,20 +21,12 @@ class DataGenerator(Sequence):
         self.test_type = test_type
         if test_type == TestType.TRAINING:
             self.num_data = config.num_train
-            self.ds = ds_to_list(config.dataset.take(config.num_train))
+            self.ds = config.training_ds
         elif test_type == TestType.VALIDATION:
             self.num_data = config.num_validation
-            self.ds = ds_to_list(config.dataset.skip(config.num_train))
+            self.ds = config.validation_ds
         else:
             raise Exception
-
-        # ids associated with files in dataset, immutable
-        self.data_ids = np.arange(self.num_data)
-        self.data_ids.setflags(write=False)
-
-        # ids of the files in the training/validation procedure
-        # reshuffles every epoch
-        self.test_ids = np.arange(self.num_data)
 
         # dimensions
         self.batch_size = config.batch_size
@@ -51,7 +43,7 @@ class DataGenerator(Sequence):
         return int(np.floor(self.num_data / self.batch_size))
 
     def on_epoch_end(self):
-        np.random.shuffle(self.test_ids)
+        self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
     def __getitem__(
         self, i: int
@@ -63,23 +55,29 @@ class DataGenerator(Sequence):
         :param i: batch index
         :return: X and Y when fitting. X only when predicting
         """
-        assert i < len(self)
+        only_input = self.test_type is TestType.VALIDATION
+        skel_imgs, node_attributes = self.get_batch_data(i, only_input=only_input)
 
-        batch_ids = np.arange(self.batch_size * i, self.batch_size * (i + 1))
-        data_ids_for_batch = [self.data_ids[b] for b in batch_ids]
+        if only_input:
+            return skel_imgs
+        else:
+            return skel_imgs, node_attributes
 
-        skel_fps = [self.ds[fp] for fp in data_ids_for_batch]
+    def get_batch_data(self, b: int, only_input: bool = False):
+        batch_fps = self.ds.skip(b * self.batch_size).take(self.batch_size)
+
+        skel_fps = ds_to_list(batch_fps)
         graph_fps = [
             fp.replace("skeleton", "graphs").replace(".png", ".json") for fp in skel_fps
         ]
 
         skel_imgs = self._generate_x_tensor(skel_fps)
+        node_attributes = self._generate_y_tensor(graph_fps)
 
-        if self.test_type is TestType.TRAINING:
-            node_attributes = self._generate_y_tensor(graph_fps)
-            return skel_imgs, node_attributes
+        if only_input:
+            return skel_imgs, None
         else:
-            return skel_imgs
+            return skel_imgs, node_attributes
 
     def _generate_x_tensor(self, skel_fps: List[str]) -> np.ndarray:
         """

@@ -25,15 +25,13 @@ class Config(BaseModel):
     img_dims: Optional[Tuple[int, int]] = None
 
     dataset: Any = None
-    train_ds: Any = None
-    validation_ds: Any = None
-
-    train_ids: Optional[Iterable] = None
-    validation_ids: Optional[Iterable] = None
 
     num_labels: Optional[int] = None
     num_validation: Optional[int] = None
     num_train: Optional[int] = None
+
+    train_ids: Optional[Iterable] = None
+    validation_ids: Optional[Iterable] = None
 
     steps_per_epoch: Optional[int]
 
@@ -75,3 +73,11 @@ class Config(BaseModel):
         if self.use_small_dataset:
             dataset = dataset.take(self.max_files)
         return dataset
+
+    @property
+    def training_ds(self):
+        return self.dataset.take(self.num_train)
+
+    @property
+    def validation_ds(self):
+        return self.dataset.skip(self.num_train)
