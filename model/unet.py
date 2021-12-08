@@ -29,10 +29,10 @@ class UNet(Model):
             self.final_layer, 1, 1, name="node_pos", activation="sigmoid"
         )
         self.degrees = single_conv(
-            self.final_layer, 1, 1, name="degrees", activation="softmax"
+            self.final_layer, 5, 1, name="degrees", activation="softmax"
         )
         self.node_types = single_conv(
-            self.final_layer, 1, 1, name="node_types", activation="softmax"
+            self.final_layer, 4, 1, name="node_types", activation="softmax"
         )
 
         # initialize Keras Model with defined above input and output layers
@@ -49,8 +49,8 @@ class UNet(Model):
             optimizer=Adam(),
             loss={
                 "node_pos": "binary_crossentropy",
-                "degrees": "categorical_crossentropy",
-                "node_types": "categorical_crossentropy",
+                "degrees": "sparse_categorical_crossentropy",
+                "node_types": "sparse_categorical_crossentropy",
             },
             metrics=["accuracy"],
         )
