@@ -39,7 +39,7 @@ def single_conv(input_tensor, n_filters, kernel_size, name, activation):
 
 
 # function that defines two sequential 2D convolutional layers with certain number of filters
-def double_conv(input_tensor, n_filters, kernel_size=3):
+def double_conv(input_tensor, n_filters, name, kernel_size=3):
     x = Conv2D(
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
@@ -55,7 +55,7 @@ def double_conv(input_tensor, n_filters, kernel_size=3):
         kernel_initializer="he_normal",
     )(x)
     x = BatchNormalization()(x)
-    x = Activation("relu")(x)
+    x = Activation("relu", name=name)(x)
     return x
 
 
