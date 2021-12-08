@@ -67,12 +67,14 @@ def save_results(save_path, results):
         binary_img = classify(results_skeleton[i, :, :, 0])
 
 
-def get_skeletonised_ds(data_path: str, shuffle: bool, seed: int) -> Dataset:
+def get_skeletonised_ds(data_path: str, seed: int) -> Dataset:
     skeletonised_files_glob = [
         os.path.join(data_path, "**/skeleton/*.png"),
         os.path.join(data_path, "**/**/skeleton/*.png"),
     ]
-    return Dataset.list_files(skeletonised_files_glob, shuffle=shuffle, seed=seed)
+    ds = Dataset.list_files(skeletonised_files_glob, shuffle=False)
+
+    return ds.shuffle(len(ds), seed=seed, reshuffle_each_iteration=False)
 
 
 def ds_to_list(dataset: Dataset) -> list:

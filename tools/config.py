@@ -4,10 +4,9 @@ import numpy as np
 import yaml
 from pydantic import BaseModel, validator
 
-from tools.data import ds_to_list, get_skeletonised_ds
+from tools.data import get_skeletonised_ds
 
 
-# generated
 class Config(BaseModel):
     # user input in .yaml file
     img_length: int
@@ -72,7 +71,7 @@ class Config(BaseModel):
         )
 
     def create_dataset(self):
-        dataset = get_skeletonised_ds(self.data_path, shuffle=True, seed=13)
+        dataset = get_skeletonised_ds(self.data_path, seed=13)
         if self.use_small_dataset:
             dataset = dataset.take(self.max_files)
         return dataset
