@@ -10,7 +10,7 @@ import tensorflow as tf
 from model.unet import UNet
 from tools import Config, DataGenerator, TestType
 from tools.image import classify
-from tools.plots import display_single_output
+from tools.plots import display_single_output, show_predictions
 
 cwd = os.getcwd()
 assert "tests" in cwd
@@ -159,6 +159,12 @@ class TestUntrainedModel(unittest.TestCase):
         for e in epochs:
             self.assertFalse(math.isnan(losses[e]))
 
+    def test_predict(self):
+        """Visual test."""
+        self.config.batch_size = 2
+        validation_ds = DataGenerator(self.config, TestType.VALIDATION)
+        show_predictions(self.model, validation_ds)
+
 
 class TestTrainedModel(TestUntrainedModel):
     @classmethod
@@ -171,28 +177,3 @@ class TestTrainedModel(TestUntrainedModel):
         unet.build()
 
         return unet
-
-    def test_predict(self):
-        validation_ds = DataGenerator(self.config, TestType.VALIDATION)
-
-        self.model.load_weights(self.weights)
-
-        results = self.model.predict(x=validation_ds, verbose=1)
-
-        # inputs
-        skel_input = _get_first_images(validation_ds)
-
-        # outputs
-        batch_id = 0
-        node_pos = results[0][batch_id]
-        node_pos, _ = classify(node_pos)
-
-        degrees = results[1][batch_id]
-        degrees, _ = classify(degrees)
-
-        node_types = results[2][batch_id]
-        node_types, _ = classify(node_types)
-
-        display_single_output([skel_input[0], None, node_pos], "node_pos")
-        display_single_output([skel_input[0], None, degrees], "degrees")
-        display_single_output([skel_input[0], None, node_types], "node_types")

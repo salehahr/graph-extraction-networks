@@ -19,87 +19,62 @@ def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
         ax.set_yticks([])
 
 
-def plot_training_sample(dataset, batch_id: int = 0):
-    batch_size = dataset.batch_size
+def plot_training_sample(dataset, batch_id: int = 0, rows: int = 3):
+    """
+    Plots the training data (inputs and labels) of a batch.
+    :param dataset: dataset containing training data
+    :param batch_id: batch to use
+    :param rows: maximum number of data points to plot
+    :return:
+    """
     skel_img, node_attrs = dataset[batch_id]
 
-    plt.figure()
-    fig, axes = plt.subplots(batch_size, 1 + dataset.output_channels)
+    assert rows <= dataset.batch_size
 
-    for b in range(batch_size):
-        input_img = np.float32(skel_img[b, :, :, :])
-        plot_img(input_img, axes[b, 0], cmap="gray")
-
-        output_matrices = {
-            attr: node_attrs[i][b, :, :, 0]
-            for i, attr in enumerate(["node_pos", "degrees", "node_types"])
-        }
-
-        output_images = classifier_preview(output_matrices, input_img * 255)
-        plot_img(
-            output_images["node_pos"],
-            axes[b, 1],
-        )
-        plot_img(output_images["degrees"], axes[b, 2])
-        plot_img(output_images["node_types"], axes[b, 3])
-
-    axes[0, 0].set_title("Skel")
-    axes[0, 1].set_title("Node pos")
-    axes[0, 2].set_title("Node degrees")
-    axes[0, 3].set_title("Node types")
+    for row in range(rows):
+        plot_sample(skel_img, node_attrs, row, rows)
 
     plt.show()
 
 
-def plot_validation_results(validation_generator, results, batch_id=0):
-    batch_size = validation_generator.batch_size
-    x, y_true = validation_generator.__getitem__(batch_id)
+def plot_sample(x: np.ndarray, y: np.ndarray, row: int = 0, rows: int = 0):
+    output_names = ["node_pos", "degrees", "node_types"]
 
-    plt.figure()
-    fig, axes = plt.subplots(batch_size, 1 + 2 * validation_generator.output_channels)
+    def _subplot_id(row, col):
+        """This function uses 0-indexing."""
+        return col + 1 + 4 * row
 
-    for i in range(batch_size):
-        input_img = x[i, :, :, :]
-        filtered_img_true = y_true[0][i, :, :, 0]
-        skeletonised_img_true = y_true[1][i, :, :, 0]
+    # set titles
+    if row == 0:
+        for col, t in enumerate(["skel"] + output_names):
+            plt.subplot(rows, 4, _subplot_id(row, col))
+            plt.title(t)
 
-        filtered_img_res = (results[0][i] * 255).astype("uint8")
+    # input
+    plt.subplot(rows, 4, _subplot_id(row, 0))
+    input_img = np.float32(x[row, :, :, :])
+    plot_img(input_img, cmap="gray")
 
-        binary_img, _ = classify(results[1][i])
-        skeletonised_img_res = binary_img.astype("uint8")
+    # outputs
+    output_matrices = {attr: y[i][row, :, :, 0] for i, attr in enumerate(output_names)}
+    output_images = classifier_preview(output_matrices, input_img * 255)
 
-        plot_img(input_img, axes[i, 0])
-
-        plot_img(filtered_img_true, axes[i, 1], cmap="gray")
-        plot_img(skeletonised_img_true, axes[i, 3], cmap="gray")
-
-        plot_img(filtered_img_res, axes[i, 2], cmap="gray")
-        plot_img(skeletonised_img_res, axes[i, 4], cmap="gray")
-
-    axes[0, 0].set_title("Input")
-    axes[0, 1].set_title("Filtered")
-    axes[0, 3].set_title("Skeletonised")
-
-    plt.show()
+    for col, attr in enumerate(output_names):
+        plt.subplot(rows, 4, _subplot_id(row, col + 1))
+        plot_img(output_images[attr])
 
 
-def plot_sample(images: dict, title=""):
-    for i, (label, img) in enumerate(images.items()):
-        plt.subplot(230 + i + 1)
-
-        cmap = "gray" if img.shape[2] == 1 else None
-        plot_img(img, cmap=cmap)
-        plt.title(label)
-    plt.suptitle(title)
-    plt.show()
+def plot_augmented(x_iter, y_iter):
+    base_imgs = plot_augmented_inputs(x_iter, "skeleton", cmap="gray")
+    plot_augmented_outputs(y_iter, base_imgs)
 
 
-def plot_generated_images(iterator, title: str = "", cmap=None):
+def plot_augmented_inputs(iterator, title: str = "", cmap=None):
     base_imgs = []
     for i in range(4):
         plt.subplot(220 + 1 + i)
         batch = iterator.next()
-        image = batch[0].astype("uint8")
+        image = batch[0]
 
         base_imgs.append(image)
         plot_img(image, cmap=cmap)
@@ -110,14 +85,18 @@ def plot_generated_images(iterator, title: str = "", cmap=None):
     return base_imgs
 
 
-def plot_classifier_images(output_iterators, base_imgs):
+def plot_augmented_outputs(output_iterators, base_imgs):
+    """Scans the matrices for integer values (nodes)
+    and plots markers according to the node attribute."""
     for k, output_iter in output_iterators.items():
         for i in range(4):
             plt.subplot(220 + 1 + i)
             batch = output_iter.next()
             out_matrix = np.round(batch[0].squeeze()).astype("uint8")
 
-            base_img = cv2.cvtColor(base_imgs[i], cv2.COLOR_GRAY2BGR).astype(np.uint8)
+            base_img = cv2.cvtColor(base_imgs[i] * 255, cv2.COLOR_GRAY2BGR).astype(
+                np.uint8
+            )
             out_image = draw_circles(base_img, out_matrix, colour_enums[k])
             out_image = cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB)
             plot_img(out_image)
@@ -140,4 +119,46 @@ def display_single_output(display_list: list, big_title: str):
         plt.axis("off")
 
     plt.suptitle(big_title)
+    plt.show()
+
+
+def show_predictions(model, dataset, batch=0, filepath=None):
+    input_images, masks = dataset.get_batch_data(batch)
+    pred_masks = model.predict(input_images)
+
+    b_id = 0
+    input_image = input_images[b_id]
+
+    gt_output_matrices = {
+        attr: masks[i][b_id]
+        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
+    }
+    gt_output_images = classifier_preview(gt_output_matrices, input_image * 255)
+
+    pred_output_matrices = {
+        attr: classify(pred_masks[i][b_id])[0]
+        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
+    }
+    pred_output_images = classifier_preview(pred_output_matrices, input_image * 255)
+
+    plt.subplot(331)
+    plot_img(input_image, cmap="gray")
+    plt.xlabel("Input")
+
+    for i, attr in enumerate(["node_pos", "degrees", "node_types"]):
+        plt.subplot(330 + 3 * (i + 1))
+        if i == 0:
+            plt.title("Truth")
+        plot_img(gt_output_images[attr])
+        plt.xlabel(attr)
+
+        plt.subplot(330 + 3 * (i + 1) - 1)
+        if i == 0:
+            plt.title("Predicted")
+        plot_img(pred_output_images[attr])
+        plt.xlabel(attr)
+
+    if filepath:
+        plt.savefig(filepath)
+
     plt.show()

@@ -50,23 +50,6 @@ def train_generator(
         yield (img, mask)
 
 
-def save_results(save_path, results):
-    """Save Results
-    Function that takes predictions from U-Net model
-    and saves them to specified folder.
-    """
-    results_filtered = results[0]
-    results_skeleton = results[1]
-
-    try:
-        print(results_filtered.shape)
-    except:
-        print(len(results_filtered))
-
-    for i, filt in enumerate(results_filtered):
-        binary_img = classify(results_skeleton[i, :, :, 0])
-
-
 def get_skeletonised_ds(data_path: str, seed: int) -> Dataset:
     skeletonised_files_glob = [
         os.path.join(data_path, "**/skeleton/*.png"),
