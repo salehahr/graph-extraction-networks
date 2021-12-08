@@ -2,18 +2,46 @@ import math
 import os
 import shutil
 import unittest
+from typing import Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
 from model.unet import UNet
 from tools import Config, DataGenerator, TestType
+from tools.image import classify
+from tools.plots import display_single_output
 
 cwd = os.getcwd()
 assert "tests" in cwd
 
 log_dir = os.path.join(cwd, "logs")
+
+
+def _get_first_images(dataset, attribute: Optional[str] = None):
+    """Returns the images of the first data point in the dataset."""
+    file_id = 0
+    batch_id = 0
+
+    def get_skel_input(x):
+        return np.expand_dims(x[batch_id], 0)
+
+    if dataset.test_type == TestType.TRAINING:
+        x, y = dataset[file_id]
+        skel_input = get_skel_input(x)
+
+        node_attributes = {
+            "node_pos": np.expand_dims(y[0][batch_id], 0),
+            "degrees": np.expand_dims(y[1][batch_id], 0),
+            "node_types": np.expand_dims(y[2][batch_id], 0),
+        }
+
+        return skel_input, node_attributes[attribute]
+    else:
+        x = dataset[file_id]
+        skel_input = get_skel_input(x)
+
+        return skel_input
 
 
 class TestSimpleModel(unittest.TestCase):
@@ -46,7 +74,7 @@ class TestSimpleModel(unittest.TestCase):
     def _test_simple_model(self, output: str, loss: str):
         model = self._get_simple_model(self.base_model.__dict__[output], loss)
 
-        skel_input, y_gt = self._get_first_images(self.training_ds, output)
+        skel_input, y_gt = _get_first_images(self.training_ds, output)
 
         hist = model.fit(x=skel_input, y=y_gt)
         losses = hist.history["loss"]
@@ -56,63 +84,27 @@ class TestSimpleModel(unittest.TestCase):
             self.assertFalse(math.isnan(l))
 
         y_pred = model.predict(x=skel_input, verbose=1)
-        y_pred = (
-            self.binary_classify(y_pred)
-            if output == "node_pos"
-            else self.categorical_classify(y_pred)
-        )
+        y_pred, is_binary = classify(y_pred)
 
-        self.display([skel_input[0], y_gt[0], y_pred[0]], output)
+        display_single_output([skel_input[0], y_gt[0], y_pred[0]], output)
+
+        return is_binary
 
     def test_node_pos_model(self):
-        self._test_simple_model("node_pos", "binary_crossentropy")
+        is_binary = self._test_simple_model("node_pos", "binary_crossentropy")
+        self.assertTrue(is_binary)
 
     def test_node_degrees_model(self):
-        self._test_simple_model("degrees", "sparse_categorical_crossentropy")
+        is_binary = self._test_simple_model(
+            "degrees", "sparse_categorical_crossentropy"
+        )
+        self.assertFalse(is_binary)
 
     def test_node_types_model(self):
-        self._test_simple_model("node_types", "sparse_categorical_crossentropy")
-
-    @staticmethod
-    def _get_first_images(dataset, attribute: str):
-        file_id = 0
-        x, y = dataset[file_id]
-
-        batch_id = 0
-        skel_input = np.expand_dims(x[batch_id], 0)
-        node_attributes = {
-            "node_pos": np.expand_dims(y[0][batch_id], 0),
-            "degrees": np.expand_dims(y[1][batch_id], 0),
-            "node_types": np.expand_dims(y[2][batch_id], 0),
-        }
-
-        return skel_input, node_attributes[attribute]
-
-    @staticmethod
-    def display(display_list: list, big_title: str):
-        title = ["Input Image", "True Mask", "Predicted Mask"]
-
-        for i in range(len(display_list)):
-            plt.subplot(1, len(display_list), i + 1)
-            plt.title(title[i])
-            plt.imshow(tf.keras.utils.array_to_img(display_list[i]))
-            plt.axis("off")
-
-        plt.suptitle(big_title)
-        plt.show()
-
-    @staticmethod
-    def binary_classify(pred_mask):
-        pred_mask[pred_mask < 0.5] = 0
-        pred_mask[pred_mask >= 0.5] = 1
-
-        return pred_mask.astype(np.uint8)
-
-    @staticmethod
-    def categorical_classify(pred_mask) -> np.ndarray:
-        pred_mask = tf.argmax(pred_mask, axis=-1)
-        pred_mask = pred_mask[..., tf.newaxis]
-        return pred_mask.numpy()
+        is_binary = self._test_simple_model(
+            "node_types", "sparse_categorical_crossentropy"
+        )
+        self.assertFalse(is_binary)
 
 
 class TestUntrainedModel(unittest.TestCase):
@@ -187,9 +179,20 @@ class TestTrainedModel(TestUntrainedModel):
 
         results = self.model.predict(x=validation_ds, verbose=1)
 
+        # inputs
+        skel_input = _get_first_images(validation_ds)
+
+        # outputs
         batch_id = 0
         node_pos = results[0][batch_id]
-        degrees = results[1][batch_id]
-        node_types = results[2][batch_id]
+        node_pos, _ = classify(node_pos)
 
-        return
+        degrees = results[1][batch_id]
+        degrees, _ = classify(degrees)
+
+        node_types = results[2][batch_id]
+        node_types, _ = classify(node_types)
+
+        display_single_output([skel_input[0], None, node_pos], "node_pos")
+        display_single_output([skel_input[0], None, degrees], "degrees")
+        display_single_output([skel_input[0], None, node_types], "node_types")

@@ -4,7 +4,7 @@ import skimage.io as io
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.data import Dataset
 
-from tools.image import classifier_preview, normalize_mask
+from tools.image import classifier_preview, classify
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
@@ -46,7 +46,7 @@ def train_generator(
     )
     train_generator = zip(image_generator, mask_generator)
     for (img, mask) in train_generator:
-        mask = normalize_mask(mask)
+        mask, _ = classify(mask)
         yield (img, mask)
 
 
@@ -64,7 +64,7 @@ def save_results(save_path, results):
         print(len(results_filtered))
 
     for i, filt in enumerate(results_filtered):
-        binary_img = normalize_mask(results_skeleton[i, :, :, 0])
+        binary_img = classify(results_skeleton[i, :, :, 0])
 
 
 def get_skeletonised_ds(data_path: str, shuffle: bool, seed: int) -> Dataset:

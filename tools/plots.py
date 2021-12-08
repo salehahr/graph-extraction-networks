@@ -1,10 +1,11 @@
 from typing import Optional
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
+from matplotlib import pyplot as plt
 
-from tools.image import classifier_preview, colour_enums, draw_circles, normalize_mask
+from tools.image import classifier_preview, classify, colour_enums, draw_circles
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -64,7 +65,7 @@ def plot_validation_results(validation_generator, results, batch_id=0):
 
         filtered_img_res = (results[0][i] * 255).astype("uint8")
 
-        binary_img = normalize_mask(results[1][i])
+        binary_img, _ = classify(results[1][i])
         skeletonised_img_res = binary_img.astype("uint8")
 
         plot_img(input_img, axes[i, 0])
@@ -123,3 +124,20 @@ def plot_classifier_images(output_iterators, base_imgs):
 
         plt.suptitle(k)
         plt.show()
+
+
+def display_single_output(display_list: list, big_title: str):
+    title = ["Input Image", "True Mask", "Predicted Mask"]
+
+    for i in range(len(display_list)):
+        image = display_list[i]
+        if image is None:
+            continue
+
+        plt.subplot(1, len(display_list), i + 1)
+        plt.title(title[i])
+        plt.imshow(tf.keras.utils.array_to_img(image))
+        plt.axis("off")
+
+    plt.suptitle(big_title)
+    plt.show()
