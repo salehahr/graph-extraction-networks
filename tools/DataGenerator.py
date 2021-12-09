@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union
 
 import numpy as np
-from keras.preprocessing.image import img_to_array, load_img
+from keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
 from tensorflow.keras.utils import Sequence
 
 from tools.data import ds_to_list
@@ -12,11 +12,9 @@ from .TestType import TestType
 
 
 class DataGenerator(Sequence):
-    """Generates data for Keras
-    Sequence based data generator. Suitable for building data generator for training and prediction.
-    """
+    """Generates training/validation data."""
 
-    def __init__(self, config, test_type: TestType):
+    def __init__(self, config, test_type: TestType, augmented: bool = True):
         # dataset settings
         self.test_type = test_type
         if test_type == TestType.TRAINING:
@@ -33,6 +31,16 @@ class DataGenerator(Sequence):
         self.img_dims = config.img_dims
         self.input_channels = config.input_channels
         self.output_channels = config.output_channels
+
+        # data_augmentation
+        self.augmentation_args = dict(
+            horizontal_flip=True,
+            vertical_flip=True,
+        )
+        self.augmented = augmented
+        self.augmenter = (
+            ImageDataGenerator(**self.augmentation_args) if augmented else None
+        )
 
         # shuffle
         self.on_epoch_end()
@@ -71,15 +79,15 @@ class DataGenerator(Sequence):
             fp.replace("skeleton", "graphs").replace(".png", ".json") for fp in skel_fps
         ]
 
-        skel_imgs = self._generate_x_tensor(skel_fps)
-        node_attributes = self._generate_y_tensor(graph_fps)
+        skel_imgs = self._generate_x_tensor(skel_fps, b)
+        node_attributes = self._generate_y_tensor(graph_fps, b)
 
         if only_input:
             return skel_imgs, None
         else:
             return skel_imgs, node_attributes
 
-    def _generate_x_tensor(self, skel_fps: List[str]) -> np.ndarray:
+    def _generate_x_tensor(self, skel_fps: List[str], seed: int) -> np.ndarray:
         """
         Generates normalised tensors of the skeletonised images.
         :param skel_fps: filepaths to the skeletonised images
@@ -88,16 +96,19 @@ class DataGenerator(Sequence):
         x_tensor = np.empty((self.batch_size, *self.img_dims, self.input_channels))
 
         for i, fp in enumerate(skel_fps):
-            x_tensor[i, :, :, 0] = img_to_array(
-                load_img(fp, grayscale=True), dtype=np.float32
-            ).squeeze()
+            x = img_to_array(load_img(fp, grayscale=True), dtype=np.float32)
+
+            if self.augmented:
+                x = self._augment_tensor(x, seed)
+
+            x_tensor[i, :, :, 0] = x.squeeze()
 
         x_normalised = x_tensor / np.float32(255)
 
         return x_normalised.astype(np.float32)
 
     def _generate_y_tensor(
-        self, graph_fps: List[str]
+        self, graph_fps: List[str], seed: int
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Generates node attribute tensors from graph.
@@ -112,8 +123,21 @@ class DataGenerator(Sequence):
             graph = PolyGraph.load(fp)
             output_matrices = generate_outputs(graph, self.img_dims[0])
 
-            y_node_pos[i, :, :, 0] = output_matrices["node_pos"].squeeze()
-            y_degrees[i, :, :, 0] = output_matrices["degrees"].squeeze()
-            y_node_types[i, :, :, 0] = output_matrices["node_types"].squeeze()
+            node_pos = output_matrices["node_pos"]
+            degrees = output_matrices["degrees"]
+            node_types = output_matrices["node_types"]
+
+            if self.augmented:
+                node_pos = self._augment_tensor(node_pos, seed)
+                degrees = self._augment_tensor(degrees, seed)
+                node_types = self._augment_tensor(node_types, seed)
+
+            y_node_pos[i, :, :, 0] = node_pos.squeeze()
+            y_degrees[i, :, :, 0] = degrees.squeeze()
+            y_node_types[i, :, :, 0] = node_types.squeeze()
 
         return y_node_pos, y_degrees, y_node_types
+
+    def _augment_tensor(self, x: np.ndarray, seed: int) -> np.ndarray:
+        x = np.expand_dims(x, axis=0)
+        return self.augmenter.flow(x, batch_size=1, seed=seed)[0]
