@@ -124,7 +124,7 @@ class DataGenerator(Sequence):
             output_matrices = generate_outputs(graph, self.img_dims[0])
 
             node_pos = output_matrices["node_pos"]
-            degrees = output_matrices["degrees"]
+            degrees = self._cap_degrees(output_matrices["degrees"])
             node_types = output_matrices["node_types"]
 
             if self.augmented:
@@ -141,3 +141,10 @@ class DataGenerator(Sequence):
     def _augment_tensor(self, x: np.ndarray, seed: int) -> np.ndarray:
         x = np.expand_dims(x, axis=0)
         return self.augmenter.flow(x, batch_size=1, seed=seed)[0]
+
+    @staticmethod
+    def _cap_degrees(degrees):
+        """Cap values at 4."""
+        cap_value = 4
+        degrees[degrees > cap_value] = cap_value
+        return degrees
