@@ -33,15 +33,15 @@ if __name__ == "__main__":
     unet.build()
 
     # creating a callback, hence best weights configurations will be saved
-    model_checkpoint = unet.checkpoint(os.path.join(log_dir, "checkpoint"))
+    model_checkpoint = unet.checkpoint(os.path.join(log_dir, "checkpoint.hdf5"))
     tensorboard_callback = unet.tensorboard_callback(log_dir)
 
     # model training
     unet.fit(
         x=training_generator,
         steps_per_epoch=len(training_generator),
-        epochs=5,
-        callbacks=[tensorboard_callback],
+        epochs=2,
+        callbacks=[tensorboard_callback, model_checkpoint],
     )
 
     # saving model weights

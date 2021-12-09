@@ -84,5 +84,12 @@ def merge(input1, input2):
 
 
 # function to create ModelCheckpoint
-def callback(name):
-    return ModelCheckpoint(name, monitor="loss", verbose=1, save_best_only=True)
+def callback(filepath):
+    return ModelCheckpoint(
+        filepath,
+        monitor="epoch_loss",
+        verbose=1,
+        save_best_only=False,
+        save_weights_only=True,
+        save_freq="epoch",
+    )
