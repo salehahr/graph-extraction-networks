@@ -5,10 +5,10 @@ from tools import Config, DataGenerator, TestType
 from tools.plots import plot_training_sample, show_predictions
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
-weights_path = os.path.join(base_path, "unet_weight_model.hdf5")
 time_tag = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 log_dir = os.path.join(base_path, "logs", time_tag)
+weights_fp = os.path.join(base_path, f"weights_{time_tag}.hdf5")
 predict_fp = os.path.join(base_path, f"img/predict_{time_tag}.png")
 
 if __name__ == "__main__":
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     plot_training_sample(training_generator)
 
     # build model
-    pretrained_weights = weights_path if os.path.isfile(weights_path) else None
+    pretrained_weights = weights_fp if os.path.isfile(weights_fp) else None
 
     from model.unet import UNet
 
@@ -40,12 +40,12 @@ if __name__ == "__main__":
     unet.fit(
         x=training_generator,
         steps_per_epoch=len(training_generator),
-        epochs=2,
+        epochs=100,
         callbacks=[tensorboard_callback, model_checkpoint],
     )
 
     # saving model weights
-    unet.save_weights(weights_path)
+    unet.save_weights(weights_fp)
 
     # display results
     show_predictions(unet, validation_generator, filepath=predict_fp)
