@@ -1,4 +1,3 @@
-from keras.callbacks import ModelCheckpoint
 from keras.layers import (
     Activation,
     BatchNormalization,
@@ -81,15 +80,3 @@ def pooling(input_tensor, dropout_rate=0.1):
 def merge(input1, input2):
     x = concatenate([input1, input2])
     return x
-
-
-# function to create ModelCheckpoint
-def callback(filepath):
-    return ModelCheckpoint(
-        filepath,
-        monitor="epoch_loss",
-        verbose=1,
-        save_best_only=False,
-        save_weights_only=True,
-        save_freq="epoch",
-    )

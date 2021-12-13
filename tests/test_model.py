@@ -112,8 +112,11 @@ class TestUntrainedModel(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
         cls.weights = os.path.join(cwd, "weights.hdf5")
+        checkpoint_path = os.path.join(log_dir, "checkpoint_{epoch}.hdf5")
+
         cls.model = cls._init_model()
-        cls.tensorboard = cls._init_tensorboard()
+        cls.tensorboard = cls.model.tensorboard_callback(log_dir)
+        cls.checkpoint = cls.model.checkpoint(checkpoint_path)
 
     @classmethod
     def _init_model(cls) -> UNet:
@@ -125,18 +128,16 @@ class TestUntrainedModel(unittest.TestCase):
 
         return unet
 
-    @classmethod
-    def _init_tensorboard(cls):
-        return cls.model.tensorboard_callback(log_dir)
-
     def _train(self, num_epochs: int = 2):
         train_ds = DataGenerator(self.config, TestType.TRAINING)
+        val_ds = DataGenerator(self.config, TestType.VALIDATION)
 
         hist = self.model.fit(
             x=train_ds,
             steps_per_epoch=len(train_ds),
             epochs=num_epochs,
-            callbacks=[self.tensorboard],
+            validation_data=val_ds,
+            callbacks=[self.tensorboard, self.checkpoint],
         )
 
         return hist.epoch, hist.history

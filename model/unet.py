@@ -1,16 +1,9 @@
+from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
-from model.utils import (
-    callback,
-    deconv,
-    double_conv,
-    input_tensor,
-    merge,
-    pooling,
-    single_conv,
-)
+from model.utils import deconv, double_conv, input_tensor, merge, pooling, single_conv
 
 
 class UNet(Model):
@@ -98,9 +91,16 @@ class UNet(Model):
         return double_conv(up9, n_filters * 1, "relu_block_1r")  # 256x256x64
 
     @staticmethod
-    def checkpoint(name):
-        return callback(name)
+    def checkpoint(filepath):
+        return ModelCheckpoint(
+            filepath,
+            monitor="epoch_loss",
+            verbose=1,
+            save_best_only=False,
+            save_weights_only=True,
+            save_freq="epoch",
+        )
 
     @staticmethod
-    def tensorboard_callback(name):
-        return TensorBoard(log_dir=name, histogram_freq=1)
+    def tensorboard_callback(filepath):
+        return TensorBoard(log_dir=filepath, histogram_freq=1, update_freq="epoch")
