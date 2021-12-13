@@ -61,31 +61,19 @@ class DataGenerator(Sequence):
         """
         Returns the i-th batch.
         :param i: batch index
-        :return: X and Y when fitting. X only when predicting
+        :return: skeletonised images and node attributes of the images in the batch
         """
-        only_input = self.test_type is TestType.VALIDATION
-        skel_imgs, node_attributes = self.get_batch_data(i, only_input=only_input)
-
-        if only_input:
-            return skel_imgs
-        else:
-            return skel_imgs, node_attributes
-
-    def get_batch_data(self, b: int, only_input: bool = False):
-        batch_fps = self.ds.skip(b * self.batch_size).take(self.batch_size)
+        batch_fps = self.ds.skip(i * self.batch_size).take(self.batch_size)
 
         skel_fps = ds_to_list(batch_fps)
         graph_fps = [
             fp.replace("skeleton", "graphs").replace(".png", ".json") for fp in skel_fps
         ]
 
-        skel_imgs = self._generate_x_tensor(skel_fps, b)
-        node_attributes = self._generate_y_tensor(graph_fps, b)
+        skel_imgs = self._generate_x_tensor(skel_fps, i)
+        node_attributes = self._generate_y_tensor(graph_fps, i)
 
-        if only_input:
-            return skel_imgs, None
-        else:
-            return skel_imgs, node_attributes
+        return skel_imgs, node_attributes
 
     def _generate_x_tensor(self, skel_fps: List[str], seed: int) -> np.ndarray:
         """
