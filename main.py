@@ -8,8 +8,8 @@ base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
 time_tag = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 log_dir = os.path.join(base_path, "logs", time_tag)
-weights_fp = os.path.join(base_path, f"weights_{time_tag}.hdf5")
-predict_fp = os.path.join(base_path, f"img/predict_{time_tag}.png")
+weights_fp = os.path.join(base_path, f"weights_{time_tag}_16f.hdf5")
+predict_fp = os.path.join(base_path, f"img/predict_{time_tag}_16f.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     unet.fit(
         x=training_generator,
         steps_per_epoch=len(training_generator),
-        epochs=100,
+        epochs=1000,
         validation_data=validation_generator,
         callbacks=[tensorboard_callback, model_checkpoint],
     )
