@@ -5,3 +5,4 @@ from enum import Enum, unique
 class TestType(Enum):
     TRAINING = 1
     VALIDATION = 2
+    TESTING = 3

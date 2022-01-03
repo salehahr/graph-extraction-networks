@@ -104,8 +104,8 @@ class TestDataset(unittest.TestCase):
             self.assertFalse(fp in list_files2)
 
     def test_train_and_val_ds(self):
-        train_ds = self.ds.take(self.config.num_train)
-        val_ds = self.ds.skip(self.config.num_train)
+        train_ds = self.config.training_ds
+        val_ds = self.config.validation_ds
 
         for fp in ds_to_list(train_ds):
             self.assertTrue(fp in self.list_of_files)
@@ -127,3 +127,13 @@ class TestDataset(unittest.TestCase):
             for bid, fp in enumerate(files):
                 file_id = i * batch_size + bid
                 self.assertEqual(fp, self.list_of_files[file_id])
+
+    def test_test_dataset(self):
+        for f in ds_to_list(self.config.test_ds):
+            self.assertTrue("test_" in f)
+
+        for f in ds_to_list(self.config.training_ds):
+            self.assertFalse("test_" in f)
+
+        for f in ds_to_list(self.config.validation_ds):
+            self.assertFalse("test_" in f)

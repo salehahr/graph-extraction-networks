@@ -23,6 +23,9 @@ class DataGenerator(Sequence):
         elif test_type == TestType.VALIDATION:
             self.num_data = config.num_validation
             self.ds = config.validation_ds
+        elif test_type == TestType.TESTING:
+            self.num_data = config.num_test
+            self.ds = config.test_ds
         else:
             raise Exception
 
