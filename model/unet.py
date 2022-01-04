@@ -91,14 +91,14 @@ class UNet(Model):
         return double_conv(up9, n_filters * 1, "relu_block_1r")  # 256x256x64
 
     @staticmethod
-    def checkpoint(filepath):
+    def checkpoint(filepath, save_frequency="epoch"):
         return ModelCheckpoint(
             filepath,
             monitor="epoch_loss",
             verbose=1,
             save_best_only=False,
             save_weights_only=True,
-            save_freq="epoch",
+            save_freq=save_frequency,
         )
 
     @staticmethod

@@ -5,11 +5,13 @@ from tools import Config, DataGenerator, TestType
 from tools.plots import plot_training_sample, show_predictions
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
+name = "nodes-4f"
 time_tag = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+label = f"{name}-{time_tag}"
 
-log_dir = os.path.join(base_path, "logs", time_tag)
-weights_fp = os.path.join(base_path, f"weights_{time_tag}_16f.hdf5")
-predict_fp = os.path.join(base_path, f"img/predict_{time_tag}_16f.png")
+log_dir = os.path.join(base_path, "logs", label)
+weights_fp = os.path.join(base_path, f"weights_{label}.hdf5")
+predict_fp = os.path.join(base_path, f"img/predict_{label}.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
@@ -27,20 +29,23 @@ if __name__ == "__main__":
 
     unet = UNet(
         input_size=(*conf.img_dims, conf.input_channels),
-        n_filters=16,
+        n_filters=4,
         pretrained_weights=pretrained_weights,
     )
     unet.build()
 
     # creating a callback, hence best weights configurations will be saved
-    model_checkpoint = unet.checkpoint(os.path.join(log_dir, "checkpoint_{epoch}.hdf5"))
+    model_checkpoint = unet.checkpoint(
+        os.path.join(log_dir, "checkpoint_{epoch}.hdf5"),
+        save_frequency=len(training_generator),
+    )
     tensorboard_callback = unet.tensorboard_callback(log_dir)
 
     # model training
     unet.fit(
         x=training_generator,
         steps_per_epoch=len(training_generator),
-        epochs=1000,
+        epochs=300,
         validation_data=validation_generator,
         callbacks=[tensorboard_callback, model_checkpoint],
     )
