@@ -33,7 +33,9 @@ class TestDataGenerator(unittest.TestCase):
     def test_input_data(self):
         step_num = 0
         batch_id = 0
-        x = self.validation_data[step_num][batch_id]
+
+        x_batch, _ = self.validation_data[step_num]
+        x = x_batch[batch_id]
 
         is_normalised = np.max(x) <= 1
 

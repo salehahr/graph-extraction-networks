@@ -123,7 +123,7 @@ def display_single_output(display_list: list, big_title: str):
 
 
 def show_predictions(model, dataset, batch=0, filepath=None):
-    input_images, masks = dataset.get_batch_data(batch)
+    input_images, masks = dataset[batch]
     pred_masks = model.predict(input_images)
 
     b_id = 0
