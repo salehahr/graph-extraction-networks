@@ -6,9 +6,11 @@ from typing import Optional
 
 import numpy as np
 import tensorflow as tf
+import wandb
+from wandb.keras import WandbCallback
 
 from model.unet import NodesNN, NodesNNExtended, UNet
-from tools import Config, DataGenerator, TestType
+from tools import Config, DataGenerator, TestType, WandbConfig
 from tools.image import classify
 from tools.plots import display_single_output, show_predictions
 
@@ -50,6 +52,7 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.wandb = WandbConfig("test_wandb_config.yaml")
         cls.training_ds = DataGenerator(cls.config, TestType.TRAINING)
 
         cls.base_model = cls._init_model()
@@ -66,10 +69,10 @@ class TestSimpleModel(unittest.TestCase):
 
         return unet
 
-    def _get_simple_model(self, output, loss):
+    def _get_simple_model(self, output, loss, optimiser="Adam"):
         """Appends a single output to the UNet model."""
         model = tf.keras.Model(inputs=self.input_layer, outputs=output)
-        model.compile(optimizer="Adam", loss=loss, metrics=["accuracy"])
+        model.compile(optimizer=optimiser, loss=loss, metrics=["accuracy"])
         return model
 
     def _test_simple_model(self, output: str, loss: str):
@@ -90,6 +93,42 @@ class TestSimpleModel(unittest.TestCase):
         display_single_output([skel_input[0], y_gt[0], y_pred[0]], output)
 
         return is_binary
+
+    def _wandb_train(self):
+        wandb_config = wandb.config
+        model = self._get_simple_model(
+            self.base_model.__dict__["node_pos"],
+            "binary_crossentropy",
+            optimiser=wandb_config.optimizer,
+        )
+
+        skel_input, y_gt = _get_first_images(self.training_ds, "node_pos")
+
+        model.fit(
+            x=skel_input,
+            y=y_gt,
+            callbacks=[WandbCallback(data_type="image")],
+            epochs=wandb_config.epochs,
+        )
+
+    def test_wandb_train(self):
+        wandb.init(
+            project=self.wandb.project,
+            entity=self.wandb.entity,
+            name=self.wandb.run_name,
+            config=self.wandb.run_config,
+        )
+        self._wandb_train()
+        wandb.finish()
+
+    def test_wandb_sweep(self):
+        sweep_id = wandb.sweep(
+            self.wandb.sweep_config,
+            entity=self.wandb.entity,
+            project=self.wandb.project,
+        )
+        wandb.agent(sweep_id, self._wandb_train, count=3)
+        wandb.finish()
 
     def test_node_pos_model(self):
         is_binary = self._test_simple_model("node_pos", "binary_crossentropy")
@@ -112,12 +151,21 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.wandb = WandbConfig("test_wandb_config.yaml")
+        wandb.init(
+            project=cls.wandb.project,
+            entity=cls.wandb.entity,
+            name=cls.wandb.run_name,
+            config=cls.wandb.run_config,
+        )
+
         cls.weights = os.path.join(cwd, "weights.hdf5")
         checkpoint_path = os.path.join(log_dir, "checkpoint_{epoch}.hdf5")
 
         cls.model = cls._init_model()
         cls.tensorboard = cls.model.tensorboard_callback(log_dir)
         cls.checkpoint = cls.model.checkpoint(checkpoint_path)
+        cls.wandb_cb = cls.model.wandb_callback()
 
     @classmethod
     def _init_model(cls) -> UNet:
@@ -129,16 +177,16 @@ class TestUntrainedModel(unittest.TestCase):
 
         return unet
 
-    def _train(self, num_epochs: int = 2):
+    def _train(self):
         train_ds = DataGenerator(self.config, TestType.TRAINING)
         val_ds = DataGenerator(self.config, TestType.VALIDATION)
 
         hist = self.model.fit(
             x=train_ds,
             steps_per_epoch=len(train_ds),
-            epochs=num_epochs,
+            epochs=wandb.config.epochs,
             validation_data=val_ds,
-            callbacks=[self.tensorboard, self.checkpoint],
+            callbacks=[self.tensorboard, self.checkpoint, self.wandb_cb],
         )
 
         return hist.epoch, hist.history
@@ -149,8 +197,7 @@ class TestUntrainedModel(unittest.TestCase):
 
     def test_train(self):
         """Smoke test to test that the model runs."""
-        num_epochs = 2
-        self._train(num_epochs)
+        self._train()
         self.model.save_weights(self.weights)
 
     def test_no_nan_losses(self):
@@ -166,6 +213,10 @@ class TestUntrainedModel(unittest.TestCase):
         self.config.batch_size = 2
         validation_ds = DataGenerator(self.config, TestType.VALIDATION)
         show_predictions(self.model, validation_ds)
+
+    @classmethod
+    def tearDownClass(cls):
+        wandb.finish()
 
 
 class TestTrainedModel(TestUntrainedModel):

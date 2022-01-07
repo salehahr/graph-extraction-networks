@@ -81,3 +81,21 @@ class Config(BaseModel):
     @property
     def validation_ds(self):
         return self.dataset.skip(self.num_train)
+
+
+class WandbConfig(BaseModel):
+    # user input in .yaml file
+    project: str
+    entity: str
+    run_name: Optional[str]
+    run_config: dict
+    sweep_config: Optional[dict]
+
+    def __init__(self, filepath: str, name=None):
+        with open(filepath) as f:
+            data = yaml.load(f, Loader=yaml.FullLoader)
+
+        super(WandbConfig, self).__init__(**data)
+
+        if name is not None:
+            self.run_name = name

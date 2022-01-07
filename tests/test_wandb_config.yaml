@@ -1,0 +1,17 @@
+project: my-test-project
+entity: salehah
+run_name: test_run
+
+run_config:
+  epochs: 2
+  optimizer: adam
+
+sweep_config:
+  name: optimiser
+  method: random
+  metric:
+    name: accuracy
+    goal: maximize
+  parameters:
+    optimizer:
+      values: ["adam", "nadam", "sgd"]

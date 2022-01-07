@@ -4,6 +4,7 @@ from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
+from wandb.keras import WandbCallback
 
 from model.utils import (
     deconv,
@@ -97,6 +98,10 @@ class UNet(Model):
     @staticmethod
     def tensorboard_callback(filepath):
         return TensorBoard(log_dir=filepath, histogram_freq=1, update_freq="epoch")
+
+    @staticmethod
+    def wandb_callback():
+        return WandbCallback()
 
 
 class NodesNN(UNet):
