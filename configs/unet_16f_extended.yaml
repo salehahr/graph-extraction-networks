@@ -1,0 +1,10 @@
+project: node_extraction
+entity: salehah
+run_name: unet_16f_extended
+
+run_config:
+  n_filters: 16
+  depth: 5
+  epochs: 150
+
+sweep_config: null
