@@ -1,41 +1,47 @@
+from typing import Tuple
+
 from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
-from model.utils import deconv, double_conv, input_tensor, merge, pooling, single_conv
+from model.utils import (
+    deconv,
+    double_conv,
+    input_tensor,
+    merge,
+    pooling,
+    pre_output_conv,
+    single_conv,
+)
 
 
 class UNet(Model):
-    def __init__(self, input_size: int, n_filters: int, pretrained_weights=None):
+    def __init__(
+        self,
+        input_size: Tuple[int, int, int],
+        n_filters: int,
+        depth: int = 5,
+        pretrained_weights=None,
+    ):
         # define input layer
         x = input_tensor(input_size)  # 256x256x3
 
         # contractive path
-        self.skips = self._contractive_path(x, n_filters)
+        self.skips = self._contractive_path(x, n_filters, depth)
 
         # expansive path
-        self.final_layer = self._expansive_path(self.skips, n_filters)
-
-        # define output layers
-        self.node_pos = single_conv(
-            self.final_layer, 1, 1, name="node_pos", activation="sigmoid"
-        )
-        self.degrees = single_conv(
-            self.final_layer, 5, 1, name="degrees", activation="softmax"
-        )
-        self.node_types = single_conv(
-            self.final_layer, 4, 1, name="node_types", activation="softmax"
-        )
+        self.final_layer = self._expansive_path(self.skips, n_filters, depth)
 
         # initialize Keras Model with defined above input and output layers
-        super(UNet, self).__init__(
-            inputs=x, outputs=[self.node_pos, self.degrees, self.node_types]
-        )
+        super(UNet, self).__init__(inputs=x, outputs=self._get_outputs())
 
-        # load preatrained weights
+        # load pretrained weights
         if pretrained_weights:
             self.load_weights(pretrained_weights)
+
+    def _get_outputs(self):
+        return self.final_layer
 
     def build(self):
         self.compile(
@@ -50,45 +56,32 @@ class UNet(Model):
         self.summary()
 
     @staticmethod
-    def _contractive_path(x, n_filters: int) -> list:
-        # contraction path
-        conv1 = double_conv(x, n_filters * 1, "relu_block_1")  # 64
-        pool1 = pooling(conv1)
+    def _contractive_path(x, n_filters: int, depth: int) -> list:
+        skips = []
+        pool = None
 
-        conv2 = double_conv(pool1, n_filters * 2, "relu_block_2")  # 128
-        pool2 = pooling(conv2)
+        for i in range(1, depth + 1):
+            conv_input = pool if i != 1 else x
 
-        conv3 = double_conv(pool2, n_filters * 4, "relu_block_3")  # 256
-        pool3 = pooling(conv3)
+            conv = double_conv(conv_input, n_filters * 2 ** (i - 1), f"relu_block_{i}")
+            pool = pooling(conv)
 
-        conv4 = double_conv(pool3, n_filters * 8, "relu_block_4")  # 512
-        pool4 = pooling(conv4)
+            skips.append(conv)
 
-        conv5 = double_conv(pool4, n_filters * 16, "relu_block_5")  # 1024
-
-        return [conv1, conv2, conv3, conv4, conv5]
+        return skips
 
     @staticmethod
-    def _expansive_path(skips, n_filters: int):
-        conv1, conv2, conv3, conv4, conv5 = skips
+    def _expansive_path(skips, n_filters: int, depth: int):
+        conv = None
 
-        # expansive path
-        up6 = deconv(conv5, n_filters * 8)  # 512
-        up6 = merge(conv4, up6)
-        conv6 = double_conv(up6, n_filters * 8, "relu_block_4r")  #
+        for i in range(depth, 1, -1):
+            up_input = skips.pop() if i == depth else conv
 
-        up7 = deconv(conv6, n_filters * 4)
-        up7 = merge(conv3, up7)
-        conv7 = double_conv(up7, n_filters * 4, "relu_block_3r")
+            up = deconv(up_input, n_filters * 2 ** (i - 2))  # 512
+            up = merge(skips.pop(), up)
+            conv = double_conv(up, n_filters * 2 ** (i - 2), f"relu_block_{i - 1}r")  #
 
-        up8 = deconv(conv7, n_filters * 2)
-        up8 = merge(conv2, up8)
-        conv8 = double_conv(up8, n_filters * 2, "relu_block_2r")
-
-        up9 = deconv(conv8, n_filters * 1)
-        up9 = merge(conv1, up9)
-
-        return double_conv(up9, n_filters * 1, "relu_block_1r")  # 256x256x64
+        return double_conv(up, n_filters * 1, "relu_block_1r")  # 256x256x64
 
     @staticmethod
     def checkpoint(filepath, save_frequency="epoch"):
@@ -104,3 +97,55 @@ class UNet(Model):
     @staticmethod
     def tensorboard_callback(filepath):
         return TensorBoard(log_dir=filepath, histogram_freq=1, update_freq="epoch")
+
+
+class NodesNN(UNet):
+    def __init__(
+        self,
+        input_size: Tuple[int, int, int],
+        n_filters: int,
+        depth: int = 5,
+        pretrained_weights=None,
+    ):
+        self.node_pos = None
+        self.degrees = None
+        self.node_types = None
+
+        super(NodesNN, self).__init__(input_size, n_filters, depth, pretrained_weights)
+
+    def _get_outputs(self):
+        self.node_pos = single_conv(
+            self.final_layer, 1, 1, name="node_pos", activation="sigmoid"
+        )
+        self.degrees = single_conv(
+            self.final_layer, 5, 1, name="degrees", activation="softmax"
+        )
+        self.node_types = single_conv(
+            self.final_layer, 4, 1, name="node_types", activation="softmax"
+        )
+
+        return [self.node_pos, self.degrees, self.node_types]
+
+
+class NodesNNExtended(NodesNN):
+    """With additional filters between the base U-Net and the node attribute outputs."""
+
+    def __init__(self, *args, **kwargs):
+        super(NodesNN, self).__init__(*args, **kwargs)
+
+    def _get_outputs(self):
+        pre_node_pos = pre_output_conv(self.final_layer, 6, name="pre_node_pos")
+        pre_degrees = pre_output_conv(self.final_layer, 6, name="pre_degrees")
+        pre_node_types = pre_output_conv(self.final_layer, 6, name="pre_node_types")
+
+        self.node_pos = single_conv(
+            pre_node_pos, 1, 1, name="node_pos", activation="sigmoid"
+        )
+        self.degrees = single_conv(
+            pre_degrees, 5, 1, name="degrees", activation="softmax"
+        )
+        self.node_types = single_conv(
+            pre_node_types, 4, 1, name="node_types", activation="softmax"
+        )
+
+        return [self.node_pos, self.degrees, self.node_types]

@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 import tensorflow as tf
 
-from model.unet import UNet
+from model.unet import NodesNN, NodesNNExtended, UNet
 from tools import Config, DataGenerator, TestType
 from tools.image import classify
 from tools.plots import display_single_output, show_predictions
@@ -57,9 +57,10 @@ class TestSimpleModel(unittest.TestCase):
 
     @classmethod
     def _init_model(cls) -> UNet:
-        unet = UNet(
+        unet = NodesNNExtended(
             input_size=(*cls.config.img_dims, cls.config.input_channels),
-            n_filters=64,
+            n_filters=4,
+            depth=5,
         )
         unet.build()
 
@@ -120,7 +121,7 @@ class TestUntrainedModel(unittest.TestCase):
 
     @classmethod
     def _init_model(cls) -> UNet:
-        unet = UNet(
+        unet = NodesNN(
             input_size=(*cls.config.img_dims, cls.config.input_channels),
             n_filters=64,
         )
@@ -170,7 +171,7 @@ class TestUntrainedModel(unittest.TestCase):
 class TestTrainedModel(TestUntrainedModel):
     @classmethod
     def _init_model(cls) -> UNet:
-        unet = UNet(
+        unet = NodesNN(
             input_size=(*cls.config.img_dims, cls.config.input_channels),
             n_filters=64,
             pretrained_weights=cls.weights,

@@ -58,6 +58,18 @@ def double_conv(input_tensor, n_filters, name, kernel_size=3):
     return x
 
 
+def pre_output_conv(input_tensor, n_filters, name, kernel_size=2):
+    x = Conv2D(
+        filters=n_filters,
+        kernel_size=(kernel_size, kernel_size),
+        padding="same",
+        kernel_initializer="he_normal",
+    )(input_tensor)
+    x = BatchNormalization()(x)
+    x = Activation("relu", name=name)(x)
+    return x
+
+
 # function that defines 2D transposed convolutional (Deconvolutional) layer
 def deconv(input_tensor, n_filters, kernel_size=3, stride=2):
     x = Conv2DTranspose(
