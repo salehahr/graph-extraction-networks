@@ -43,7 +43,7 @@ class PolyGraph(nx.Graph):
 
     @property
     def adj_matrix(self) -> np.ndarray:
-        return np.hstack(self.positions_vector, nx.convert_matrix.to_numpy_array(self))
+        return nx.convert_matrix.to_numpy_array(self)
 
     @property
     def length_matrix(self) -> np.ndarray:
@@ -70,7 +70,9 @@ class PolyGraph(nx.Graph):
         num_nodes = len(self)
         stacked_matrix = np.zeros((4, num_nodes, 2 + num_nodes))
 
-        stacked_matrix[0, :, :] = self.adj_matrix
+        stacked_matrix[0, :2, :] = self.positions_vector
+
+        stacked_matrix[0, 2:, :] = self.adj_matrix
         stacked_matrix[1, :, :] = self.length_matrix
         stacked_matrix[2, :, :] = self.coeff3_matrix
         stacked_matrix[3, :, :] = self.coeff2_matrix
