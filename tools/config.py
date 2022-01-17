@@ -1,6 +1,5 @@
 from typing import Any, Iterable, Optional, Tuple
 
-import numpy as np
 import yaml
 from pydantic import BaseModel, validator
 

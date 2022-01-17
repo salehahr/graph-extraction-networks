@@ -4,6 +4,13 @@ from tensorflow.data import Dataset
 
 
 def get_skeletonised_ds(data_path: str, seed: int, is_test: bool = False) -> Dataset:
+    """
+    Returns skeletonised image paths.
+    :param data_path: folder where the data is stored
+    :param seed: seed for shuffling function, set None for random
+    :param is_test: True if test set filepaths are to be used
+    :return: the skeletonised image paths as a Dataset object
+    """
     if is_test:
         skeletonised_files_glob = [
             os.path.join(data_path, "test_*/skeleton/*.png"),
@@ -22,9 +29,3 @@ def get_skeletonised_ds(data_path: str, seed: int, is_test: bool = False) -> Dat
 
 def ds_to_list(dataset: Dataset) -> list:
     return [f.decode("utf-8") for f in dataset.as_numpy_iterator()]
-
-
-def get_next_filepaths_from_ds(dataset: Dataset):
-    skel_fp = next(iter(dataset)).numpy().decode("utf-8")
-    graph_fp = skel_fp.replace("skeleton", "graphs").replace(".png", ".json")
-    return skel_fp, graph_fp
