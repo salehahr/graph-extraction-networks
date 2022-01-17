@@ -2,19 +2,19 @@ import unittest
 
 import numpy as np
 
-from tools import Config, DataGenerator, TestType
+from tools import Config, NodeExtractionDG, TestType
 from tools.data import ds_to_list
 from tools.plots import plot_training_sample
 
 
-class TestDataGenerator(unittest.TestCase):
+class TestNodeExtractionDG(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
         network = cls.config.network.node_extraction
 
-        cls.training_data = DataGenerator(cls.config, network, TestType.TRAINING)
-        cls.validation_data = DataGenerator(cls.config, network, TestType.VALIDATION)
+        cls.training_data = NodeExtractionDG(cls.config, network, TestType.TRAINING)
+        cls.validation_data = NodeExtractionDG(cls.config, network, TestType.VALIDATION)
 
     def test_training_generator(self):
         self.assertEqual(len(self.training_data), 9)

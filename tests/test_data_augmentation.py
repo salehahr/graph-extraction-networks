@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 
-from tools import Config, DataGenerator, TestType
+from tools import Config, NodeExtractionDG, TestType
 from tools.plots import plot_augmented, plot_training_sample
 
 
@@ -14,7 +14,7 @@ class TestDataAugmentation(unittest.TestCase):
         network = cls.config.network.node_extraction
 
         cls.filepaths = cls.config.dataset
-        cls.training_data = DataGenerator(
+        cls.training_data = NodeExtractionDG(
             cls.config, network, TestType.TRAINING, augmented=False
         )
 

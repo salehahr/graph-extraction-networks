@@ -3,7 +3,7 @@ import unittest
 import tensorflow as tf
 
 from model.unet import NodesNN, UNet
-from tools import Config, DataGenerator, TestType
+from tools import Config, NodeExtractionDG, TestType
 
 
 class TestUNetLayers(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestUNetLayers(unittest.TestCase):
         cls.config = Config("test_config.yaml")
         cls.network = cls.config.network.node_extraction
 
-        cls.training_ds = DataGenerator(cls.config, cls.network, TestType.TRAINING)
+        cls.training_ds = NodeExtractionDG(cls.config, cls.network, TestType.TRAINING)
         cls.input_size = (*cls.config.img_dims, cls.network.input_channels)
         cls.num_filters = 4
         cls.model = cls._init_model()

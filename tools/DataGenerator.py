@@ -1,7 +1,8 @@
 from typing import List, Tuple, Union
 
 import numpy as np
-from keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
+from keras.preprocessing.image import (ImageDataGenerator, img_to_array,
+                                       load_img)
 from tensorflow.keras.utils import Sequence
 
 from tools.data import ds_to_list
@@ -56,29 +57,25 @@ class DataGenerator(Sequence):
     def on_epoch_end(self):
         self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
-    def __getitem__(
-        self, i: int
-    ) -> Union[
-        np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray]]
-    ]:
-        """
-        Returns the i-th batch.
-        :param i: batch index
-        :return: skeletonised images and node attributes of the images in the batch
-        """
-        batch_fps = self.ds.skip(i * self.batch_size).take(self.batch_size)
+    @staticmethod
+    def _cap_degrees(degrees):
+        """Cap values at 4."""
+        cap_value = 4
+        degrees[degrees > cap_value] = cap_value
+        return degrees
 
+    def _get_batch_fps(self, i):
+        """Returns filepaths of the batch (skeletonised images and graphs)."""
+        batch_fps = self.ds.skip(i * self.batch_size).take(self.batch_size)
         skel_fps = ds_to_list(batch_fps)
+
         graph_fps = [
             fp.replace("skeleton", "graphs").replace(".png", ".json") for fp in skel_fps
         ]
 
-        skel_imgs = self._generate_x_tensor(skel_fps, i)
-        node_attributes = self._generate_y_tensor(graph_fps, i)
+        return skel_fps, graph_fps
 
-        return skel_imgs, node_attributes
-
-    def _generate_x_tensor(self, skel_fps: List[str], seed: int) -> np.ndarray:
+    def _generate_skel_imgs(self, skel_fps: List[str], seed: int) -> np.ndarray:
         """
         Generates normalised tensors of the skeletonised images.
         :param skel_fps: filepaths to the skeletonised images
@@ -97,6 +94,28 @@ class DataGenerator(Sequence):
         x_normalised = x_tensor / np.float32(255)
 
         return x_normalised.astype(np.float32)
+
+
+class NodeExtractionDG(DataGenerator):
+    def __getitem__(
+        self, i: int
+    ) -> Union[
+        np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray]]
+    ]:
+        """
+        Returns the i-th batch.
+        :param i: batch index
+        :return: skeletonised images and node attributes of the images in the batch
+        """
+        skel_fps, graph_fps = self._get_batch_fps(i)
+
+        skel_imgs = self._generate_x_tensor(skel_fps, i)
+        node_attributes = self._generate_y_tensor(graph_fps, i)
+
+        return skel_imgs, node_attributes
+
+    def _generate_x_tensor(self, skel_fps: List[str], seed: int) -> np.ndarray:
+        return self._generate_skel_imgs(skel_fps, seed)
 
     def _generate_y_tensor(
         self, graph_fps: List[str], seed: int
@@ -132,10 +151,3 @@ class DataGenerator(Sequence):
     def _augment_tensor(self, x: np.ndarray, seed: int) -> np.ndarray:
         x = np.expand_dims(x, axis=0)
         return self.augmenter.flow(x, batch_size=1, seed=seed)[0]
-
-    @staticmethod
-    def _cap_degrees(degrees):
-        """Cap values at 4."""
-        cap_value = 4
-        degrees[degrees > cap_value] = cap_value
-        return degrees

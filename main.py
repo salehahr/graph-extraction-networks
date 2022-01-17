@@ -4,7 +4,7 @@ import os
 import wandb
 
 from model.unet import NodesNNExtended
-from tools import Config, DataGenerator, TestType, WandbConfig
+from tools import Config, NodeExtractionDG, TestType, WandbConfig
 from tools.plots import plot_training_sample, show_predictions
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
@@ -31,8 +31,8 @@ if __name__ == "__main__":
     )
 
     # generate data
-    training_generator = DataGenerator(conf, network, TestType.TRAINING)
-    validation_generator = DataGenerator(conf, network, TestType.VALIDATION)
+    training_generator = NodeExtractionDG(conf, network, TestType.TRAINING)
+    validation_generator = NodeExtractionDG(conf, network, TestType.VALIDATION)
     plot_training_sample(training_generator)
 
     # build model

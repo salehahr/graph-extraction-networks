@@ -10,7 +10,7 @@ import wandb
 from wandb.keras import WandbCallback
 
 from model.unet import NodesNN, NodesNNExtended, UNet
-from tools import Config, DataGenerator, TestType, WandbConfig
+from tools import Config, NodeExtractionDG, TestType, WandbConfig
 from tools.image import classify
 from tools.plots import display_single_output, show_predictions
 
@@ -55,7 +55,7 @@ class TestSimpleModel(unittest.TestCase):
         cls.network = cls.config.network.node_extraction
 
         cls.wandb = WandbConfig("test_wandb_config.yaml")
-        cls.training_ds = DataGenerator(cls.config, cls.network, TestType.TRAINING)
+        cls.training_ds = NodeExtractionDG(cls.config, cls.network, TestType.TRAINING)
 
         cls.base_model = cls._init_model()
         cls.input_layer = cls.base_model.get_layer("input").output
@@ -182,8 +182,8 @@ class TestUntrainedModel(unittest.TestCase):
         return unet
 
     def _train(self):
-        train_ds = DataGenerator(self.config, self.network, TestType.TRAINING)
-        val_ds = DataGenerator(self.config, self.network, TestType.VALIDATION)
+        train_ds = NodeExtractionDG(self.config, self.network, TestType.TRAINING)
+        val_ds = NodeExtractionDG(self.config, self.network, TestType.VALIDATION)
 
         hist = self.model.fit(
             x=train_ds,
@@ -215,7 +215,7 @@ class TestUntrainedModel(unittest.TestCase):
     def test_predict(self):
         """Visual test."""
         self.config.batch_size = 2
-        validation_ds = DataGenerator(self.config, self.network, TestType.VALIDATION)
+        validation_ds = NodeExtractionDG(self.config, self.network, TestType.VALIDATION)
         show_predictions(self.model, validation_ds)
 
     @classmethod

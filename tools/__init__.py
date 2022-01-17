@@ -1,4 +1,4 @@
 from .config import Config, WandbConfig
-from .DataGenerator import DataGenerator
+from .DataGenerator import DataGenerator, NodeExtractionDG
 from .PolyGraph import PolyGraph
 from .TestType import TestType
