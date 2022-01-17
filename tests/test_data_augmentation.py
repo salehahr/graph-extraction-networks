@@ -11,9 +11,11 @@ class TestDataAugmentation(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        network = cls.config.network.node_extraction
+
         cls.filepaths = cls.config.dataset
         cls.training_data = DataGenerator(
-            cls.config, TestType.TRAINING, augmented=False
+            cls.config, network, TestType.TRAINING, augmented=False
         )
 
         cls.img_datagen = cls._init_data_augmenter()

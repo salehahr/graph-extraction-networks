@@ -20,6 +20,8 @@ predict_fp = os.path.join(base_path, f"img/predict_{label}.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
+    network = conf.network.node_extraction
+
     wandb_config = WandbConfig(wandb_fp, name)
     wandb.init(
         project=wandb_config.project,
@@ -29,14 +31,14 @@ if __name__ == "__main__":
     )
 
     # generate data
-    training_generator = DataGenerator(conf, TestType.TRAINING)
-    validation_generator = DataGenerator(conf, TestType.VALIDATION)
+    training_generator = DataGenerator(conf, network, TestType.TRAINING)
+    validation_generator = DataGenerator(conf, network, TestType.VALIDATION)
     plot_training_sample(training_generator)
 
     # build model
     pretrained_weights = weights_fp if os.path.isfile(weights_fp) else None
     unet = NodesNNExtended(
-        input_size=(*conf.img_dims, conf.input_channels),
+        input_size=(*conf.img_dims, network.input_channels),
         n_filters=wandb.config.n_filters,
         depth=wandb.config.depth,
         pretrained_weights=pretrained_weights,

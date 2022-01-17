@@ -1,4 +1,4 @@
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Iterable, Optional, Tuple, Union
 
 import yaml
 from pydantic import BaseModel, validator
@@ -6,11 +6,32 @@ from pydantic import BaseModel, validator
 from tools.data import get_skeletonised_ds
 
 
+class InputConfig(BaseModel):
+    # user input in .yaml file
+    input_channels: int
+    output_channels: int
+
+    def __init__(self, data):
+        super(InputConfig, self).__init__(**data)
+
+
+class NNConfig(BaseModel):
+    # user input in .yaml file
+    node_extraction: Union[dict, InputConfig]
+    graph_extraction: Union[dict, InputConfig]
+
+    @validator("node_extraction", "graph_extraction")
+    def set_network(cls, v):
+        return InputConfig(v)
+
+    def __init__(self, data):
+        super(NNConfig, self).__init__(**data)
+
+
 class Config(BaseModel):
     # user input in .yaml file
     img_length: int
-    input_channels: int
-    output_channels: int
+    network: Union[dict, NNConfig]
 
     data_path: str
     save_path: str
@@ -42,6 +63,10 @@ class Config(BaseModel):
             return int(v)
         else:
             return None
+
+    @validator("network")
+    def set_network(cls, v):
+        return NNConfig(v)
 
     def __init__(self, filepath: str):
         with open(filepath) as f:

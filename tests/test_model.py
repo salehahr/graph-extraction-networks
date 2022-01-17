@@ -52,8 +52,10 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.network = cls.config.network.node_extraction
+
         cls.wandb = WandbConfig("test_wandb_config.yaml")
-        cls.training_ds = DataGenerator(cls.config, TestType.TRAINING)
+        cls.training_ds = DataGenerator(cls.config, cls.network, TestType.TRAINING)
 
         cls.base_model = cls._init_model()
         cls.input_layer = cls.base_model.get_layer("input").output
@@ -61,7 +63,7 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def _init_model(cls) -> UNet:
         unet = NodesNNExtended(
-            input_size=(*cls.config.img_dims, cls.config.input_channels),
+            input_size=(*cls.config.img_dims, cls.network.input_channels),
             n_filters=4,
             depth=5,
         )
@@ -151,6 +153,8 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.network = cls.config.network.node_extraction
+
         cls.wandb = WandbConfig("test_wandb_config.yaml")
         wandb.init(
             project=cls.wandb.project,
@@ -170,7 +174,7 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def _init_model(cls) -> UNet:
         unet = NodesNN(
-            input_size=(*cls.config.img_dims, cls.config.input_channels),
+            input_size=(*cls.config.img_dims, cls.network.input_channels),
             n_filters=64,
         )
         unet.build()
@@ -178,8 +182,8 @@ class TestUntrainedModel(unittest.TestCase):
         return unet
 
     def _train(self):
-        train_ds = DataGenerator(self.config, TestType.TRAINING)
-        val_ds = DataGenerator(self.config, TestType.VALIDATION)
+        train_ds = DataGenerator(self.config, self.network, TestType.TRAINING)
+        val_ds = DataGenerator(self.config, self.network, TestType.VALIDATION)
 
         hist = self.model.fit(
             x=train_ds,
@@ -211,7 +215,7 @@ class TestUntrainedModel(unittest.TestCase):
     def test_predict(self):
         """Visual test."""
         self.config.batch_size = 2
-        validation_ds = DataGenerator(self.config, TestType.VALIDATION)
+        validation_ds = DataGenerator(self.config, self.network, TestType.VALIDATION)
         show_predictions(self.model, validation_ds)
 
     @classmethod
@@ -223,7 +227,7 @@ class TestTrainedModel(TestUntrainedModel):
     @classmethod
     def _init_model(cls) -> UNet:
         unet = NodesNN(
-            input_size=(*cls.config.img_dims, cls.config.input_channels),
+            input_size=(*cls.config.img_dims, cls.network.input_channels),
             n_filters=64,
             pretrained_weights=cls.weights,
         )

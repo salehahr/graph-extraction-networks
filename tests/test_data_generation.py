@@ -11,8 +11,10 @@ class TestDataGenerator(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.training_data = DataGenerator(cls.config, TestType.TRAINING)
-        cls.validation_data = DataGenerator(cls.config, TestType.VALIDATION)
+        network = cls.config.network.node_extraction
+
+        cls.training_data = DataGenerator(cls.config, network, TestType.TRAINING)
+        cls.validation_data = DataGenerator(cls.config, network, TestType.VALIDATION)
 
     def test_training_generator(self):
         self.assertEqual(len(self.training_data), 9)

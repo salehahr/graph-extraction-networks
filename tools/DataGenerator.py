@@ -14,7 +14,7 @@ from .TestType import TestType
 class DataGenerator(Sequence):
     """Generates training/validation data."""
 
-    def __init__(self, config, test_type: TestType, augmented: bool = True):
+    def __init__(self, config, network, test_type: TestType, augmented: bool = True):
         # dataset settings
         self.test_type = test_type
         if test_type == TestType.TRAINING:
@@ -32,8 +32,8 @@ class DataGenerator(Sequence):
         # dimensions
         self.batch_size = config.batch_size
         self.img_dims = config.img_dims
-        self.input_channels = config.input_channels
-        self.output_channels = config.output_channels
+        self.input_channels = network.input_channels
+        self.output_channels = network.output_channels
 
         # data_augmentation
         self.augmentation_args = dict(
