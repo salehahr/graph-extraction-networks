@@ -73,13 +73,15 @@ class UNet(Model):
 
     @staticmethod
     def _expansive_path(skips, n_filters: int, depth: int):
+        up = None
         conv = None
+        skips_copy = skips.copy()
 
         for i in range(depth, 1, -1):
-            up_input = skips.pop() if i == depth else conv
+            up_input = skips_copy.pop() if i == depth else conv
 
             up = deconv(up_input, n_filters * 2 ** (i - 2))  # 512
-            up = merge(skips.pop(), up)
+            up = merge(skips_copy.pop(), up)
             conv = double_conv(up, n_filters * 2 ** (i - 2), f"relu_block_{i - 1}r")  #
 
         return double_conv(up, n_filters * 1, "relu_block_1r")  # 256x256x64
