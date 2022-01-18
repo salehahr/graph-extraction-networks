@@ -1,50 +1,46 @@
-from typing import List, Tuple, Union
+from abc import ABC
+from typing import List, Tuple
 
 import numpy as np
-from keras.preprocessing.image import (ImageDataGenerator, img_to_array,
-                                       load_img)
-from tensorflow.keras.utils import Sequence
+import tensorflow as tf
 
-from tools.data import ds_to_list
-from tools.image import generate_outputs
-from tools.PolyGraph import PolyGraph
+from tools.data import fp_to_adj_matr, fp_to_grayscale_img, fp_to_node_attributes
 
 from .TestType import TestType
 
 
-class DataGenerator(Sequence):
-    """Generates training/validation data."""
+def to_skel_img(fp):
+    return fp_to_grayscale_img(fp)
+
+
+class DataGenerator(tf.keras.utils.Sequence, ABC):
+    """Generates batches of training/validation/test data."""
 
     def __init__(self, config, network, test_type: TestType, augmented: bool = True):
         # dataset settings
         self.test_type = test_type
         if test_type == TestType.TRAINING:
-            self.num_data = config.num_train
-            self.ds = config.training_ds
+            num_data = config.num_train
+            ds = config.training_ds
         elif test_type == TestType.VALIDATION:
-            self.num_data = config.num_validation
-            self.ds = config.validation_ds
+            num_data = config.num_validation
+            ds = config.validation_ds
         elif test_type == TestType.TESTING:
-            self.num_data = config.num_test
-            self.ds = config.test_ds
+            num_data = config.num_test
+            ds = config.test_ds
         else:
             raise Exception
 
         # dimensions
+        self.num_data = num_data
+        self.ds = ds.batch(config.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
         self.batch_size = config.batch_size
         self.img_dims = config.img_dims
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
 
         # data_augmentation
-        self.augmentation_args = dict(
-            horizontal_flip=True,
-            vertical_flip=True,
-        )
         self.augmented = augmented
-        self.augmenter = (
-            ImageDataGenerator(**self.augmentation_args) if augmented else None
-        )
 
         # shuffle
         self.on_epoch_end()
@@ -57,97 +53,93 @@ class DataGenerator(Sequence):
     def on_epoch_end(self):
         self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
-    @staticmethod
-    def _cap_degrees(degrees):
-        """Cap values at 4."""
-        cap_value = 4
-        degrees[degrees > cap_value] = cap_value
-        return degrees
+    def _get_data(self, i: int):
+        skel_fps, graph_fps = self._get_batch_fps(i)
 
-    def _get_batch_fps(self, i):
+        skel_imgs = skel_fps.map(to_skel_img, num_parallel_calls=tf.data.AUTOTUNE)
+        node_pos, degrees, node_types, adj_matr = self._get_graph_data(graph_fps)
+
+        return skel_imgs, node_pos, degrees, node_types, adj_matr
+
+    def _get_batch_fps(self, i: int) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
         """Returns filepaths of the batch (skeletonised images and graphs)."""
-        batch_fps = self.ds.skip(i * self.batch_size).take(self.batch_size)
-        skel_fps = ds_to_list(batch_fps)
+        skel_fps = self.ds.skip(i).take(1).unbatch()
 
-        graph_fps = [
-            fp.replace("skeleton", "graphs").replace(".png", ".json") for fp in skel_fps
-        ]
+        def skel_to_graph(skel_fp):
+            graph_fp = tf.strings.regex_replace(skel_fp, "skeleton", "graphs")
+            graph_fp = tf.strings.regex_replace(graph_fp, "\.png", ".json")
+            return graph_fp
+
+        graph_fps = skel_fps.map(skel_to_graph, num_parallel_calls=tf.data.AUTOTUNE)
 
         return skel_fps, graph_fps
 
-    def _generate_skel_imgs(self, skel_fps: List[str], seed: int) -> np.ndarray:
+    def _get_graph_data(
+        self, graph_fps: tf.data.Dataset
+    ) -> Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset, tf.data.Dataset]:
         """
-        Generates normalised tensors of the skeletonised images.
-        :param skel_fps: filepaths to the skeletonised images
-        :return: skeletonised image tensor, normalised
+        Generates node attribute tensors from graph.
+        :param graph_fps: filepaths to the graph objects
+        :return: node attributes and adjacency vector
         """
-        x_tensor = np.empty((self.batch_size, *self.img_dims, self.input_channels))
 
-        for i, fp in enumerate(skel_fps):
-            x = img_to_array(load_img(fp, grayscale=True), dtype=np.float32)
+        def to_node_attributes(fp):
+            return tf.numpy_function(
+                func=fp_to_node_attributes, inp=[fp, self.img_dims[0]], Tout=tf.uint8
+            )
 
-            if self.augmented:
-                x = self._augment_tensor(x, seed)
+        def to_adj_matr(fp: str) -> np.ndarray:
+            return tf.numpy_function(func=fp_to_adj_matr, inp=[fp], Tout=tf.uint8)
 
-            x_tensor[i, :, :, 0] = x.squeeze()
+        node_attrs = graph_fps.map(to_node_attributes).unbatch()
+        adj_matr = graph_fps.map(to_adj_matr)
 
-        x_normalised = x_tensor / np.float32(255)
+        node_pos = node_attrs.window(1, shift=3).flat_map(lambda x: x)
+        degrees = node_attrs.skip(1).window(1, shift=3).flat_map(lambda x: x)
+        node_types = node_attrs.skip(2).window(1, shift=3).flat_map(lambda x: x)
 
-        return x_normalised.astype(np.float32)
+        return node_pos, degrees, node_types, adj_matr
+
+    def _augment(self, seed: int, data: List[tf.data.Dataset]):
+        def augment(x):
+            return self._augment_tensor(x, seed=seed)
+
+        return [d.map(augment) for d in data] if self.augmented else data
+
+    @staticmethod
+    def _augment_tensor(x: tf.Tensor, seed: int) -> tf.Tensor:
+        x = tf.image.random_flip_left_right(x, seed=seed)
+        x = tf.image.random_flip_up_down(x, seed=seed)
+        return x
+
+    def _rebatch(self, data: List[tf.data.Dataset]) -> List[tf.Tensor]:
+        def rebatch(x):
+            return (
+                x.batch(self.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
+                .take(1)
+                .get_single_element()
+            )
+
+        return [rebatch(d) for d in data]
 
 
 class NodeExtractionDG(DataGenerator):
     def __getitem__(
         self, i: int
-    ) -> Union[
-        np.ndarray, Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray]]
-    ]:
+    ) -> Tuple[tf.Tensor, Tuple[tf.Tensor, tf.Tensor, tf.Tensor]]:
         """
         Returns the i-th batch.
         :param i: batch index
         :return: skeletonised images and node attributes of the images in the batch
         """
-        skel_fps, graph_fps = self._get_batch_fps(i)
+        skel_imgs, node_pos, degrees, node_types, _ = self._get_data(i)
 
-        skel_imgs = self._generate_x_tensor(skel_fps, i)
-        node_attributes = self._generate_y_tensor(graph_fps, i)
+        # augment
+        input_data = [skel_imgs, node_pos, degrees, node_types]
+        input_data = self._augment(i, input_data)
 
-        return skel_imgs, node_attributes
+        # rebatch
+        skel_imgs, node_pos, degrees, node_types = self._rebatch(input_data)
+        node_attrs = (node_pos, degrees, node_types)
 
-    def _generate_x_tensor(self, skel_fps: List[str], seed: int) -> np.ndarray:
-        return self._generate_skel_imgs(skel_fps, seed)
-
-    def _generate_y_tensor(
-        self, graph_fps: List[str], seed: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Generates node attribute tensors from graph.
-        :param graph_fps: filepaths to the graph objects
-        :return: node position, node degree and node type tensors
-        """
-        y_node_pos = np.empty((self.batch_size, *self.img_dims, 1), dtype=np.uint8)
-        y_degrees = np.empty((self.batch_size, *self.img_dims, 1), dtype=np.uint8)
-        y_node_types = np.empty((self.batch_size, *self.img_dims, 1), dtype=np.uint8)
-
-        for i, fp in enumerate(graph_fps):
-            graph = PolyGraph.load(fp)
-            output_matrices = generate_outputs(graph, self.img_dims[0])
-
-            node_pos = output_matrices["node_pos"]
-            degrees = self._cap_degrees(output_matrices["degrees"])
-            node_types = output_matrices["node_types"]
-
-            if self.augmented:
-                node_pos = self._augment_tensor(node_pos, seed)
-                degrees = self._augment_tensor(degrees, seed)
-                node_types = self._augment_tensor(node_types, seed)
-
-            y_node_pos[i, :, :, 0] = node_pos.squeeze()
-            y_degrees[i, :, :, 0] = degrees.squeeze()
-            y_node_types[i, :, :, 0] = node_types.squeeze()
-
-        return y_node_pos, y_degrees, y_node_types
-
-    def _augment_tensor(self, x: np.ndarray, seed: int) -> np.ndarray:
-        x = np.expand_dims(x, axis=0)
-        return self.augmenter.flow(x, batch_size=1, seed=seed)[0]
+        return skel_imgs, node_attrs

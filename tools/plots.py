@@ -19,25 +19,25 @@ def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
         ax.set_yticks([])
 
 
-def plot_training_sample(dataset, batch_id: int = 0, rows: int = 3):
+def plot_training_sample(dataset, step_num: int = 0, rows: int = 3):
     """
     Plots the training data (inputs and labels) of a batch.
     :param dataset: dataset containing training data
-    :param batch_id: batch to use
+    :param step_num: which epoch step
     :param rows: maximum number of data points to plot
     :return:
     """
-    skel_img, node_attrs = dataset[batch_id]
+    b_skel_img, b_node_attrs = dataset[step_num]
 
     assert rows <= dataset.batch_size
 
     for row in range(rows):
-        plot_sample(skel_img, node_attrs, row, rows)
+        plot_sample(b_skel_img, b_node_attrs, row, rows)
 
     plt.show()
 
 
-def plot_sample(x: np.ndarray, y: np.ndarray, row: int = 0, rows: int = 0):
+def plot_sample(x: tf.Tensor, y: tuple, row: int = 0, rows: int = 0):
     output_names = ["node_pos", "degrees", "node_types"]
 
     def _subplot_id(row, col):
@@ -52,11 +52,13 @@ def plot_sample(x: np.ndarray, y: np.ndarray, row: int = 0, rows: int = 0):
 
     # input
     plt.subplot(rows, 4, _subplot_id(row, 0))
-    input_img = np.float32(x[row, :, :, :])
+    input_img = np.float32(x.numpy()[row, :, :, :])
     plot_img(input_img, cmap="gray")
 
     # outputs
-    output_matrices = {attr: y[i][row, :, :, 0] for i, attr in enumerate(output_names)}
+    output_matrices = {
+        attr: y[i].numpy()[row, :, :, 0] for i, attr in enumerate(output_names)
+    }
     output_images = classifier_preview(output_matrices, input_img * 255)
 
     for col, attr in enumerate(output_names):
@@ -122,15 +124,20 @@ def display_single_output(display_list: list, big_title: str):
     plt.show()
 
 
-def show_predictions(model, dataset, batch=0, filepath=None):
-    input_images, masks = dataset[batch]
+def show_predictions(
+    model: tf.keras.models.Model,
+    data_generator,
+    batch: int = 0,
+    filepath: str = None,
+):
+    input_images, masks = data_generator[batch]
     pred_masks = model.predict(input_images)
 
     b_id = 0
-    input_image = input_images[b_id]
+    input_image = input_images[b_id].numpy()
 
     gt_output_matrices = {
-        attr: masks[i][b_id]
+        attr: masks[i][b_id].numpy()
         for i, attr in enumerate(["node_pos", "degrees", "node_types"])
     }
     gt_output_images = classifier_preview(gt_output_matrices, input_image * 255)
