@@ -44,14 +44,13 @@ class UNet(Model):
     def _get_outputs(self):
         return self.final_layer
 
+    def _get_loss(self):
+        return {"final": "sparse_categorical_crossentropy"}
+
     def build(self):
         self.compile(
             optimizer=Adam(),
-            loss={
-                "node_pos": "binary_crossentropy",
-                "degrees": "sparse_categorical_crossentropy",
-                "node_types": "sparse_categorical_crossentropy",
-            },
+            loss=self._get_loss(),
             metrics=["accuracy"],
         )
         self.summary()
@@ -132,6 +131,13 @@ class NodesNN(UNet):
         )
 
         return [self.node_pos, self.degrees, self.node_types]
+
+    def _get_loss(self):
+        return {
+            "node_pos": "binary_crossentropy",
+            "degrees": "sparse_categorical_crossentropy",
+            "node_types": "sparse_categorical_crossentropy",
+        }
 
 
 class NodesNNExtended(NodesNN):
