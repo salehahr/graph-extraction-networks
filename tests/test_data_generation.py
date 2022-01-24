@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from tools import Config, NodeExtractionDG, TestType
+from tools import Config, GraphExtractionDG, NodeExtractionDG, TestType
 from tools.data import ds_to_list
 from tools.plots import plot_training_sample
 
@@ -68,6 +68,57 @@ class TestNodeExtractionDG(unittest.TestCase):
         self.assertEqual(node_types.dtype, np.uint8)
         self.assertEqual(np.min(node_types), 0)
         self.assertLessEqual(np.max(node_types), 3)
+
+
+class TestGraphExtractionDG(TestNodeExtractionDG):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = Config("test_config.yaml")
+        network = cls.config.network.graph_extraction
+
+        cls.training_data = GraphExtractionDG(cls.config, network, TestType.TRAINING)
+        cls.validation_data = GraphExtractionDG(
+            cls.config, network, TestType.VALIDATION
+        )
+
+    def test_plot_training_sample(self):
+        plot_training_sample(self.training_data, network=3)
+
+    def test_input_data(self):
+        step_num = 0
+        batch_id = 0
+
+        x_batch, _ = self.validation_data[step_num]
+
+        skel_img = x_batch[0][batch_id].numpy()
+        is_normalised = np.max(skel_img) <= 1
+        self.assertTrue(is_normalised)
+        self.assertEqual(skel_img.shape, (256, 256, 1))
+        self.assertEqual(skel_img.dtype, np.float32)
+
+        node_pos = x_batch[1][batch_id].numpy()
+        self.assertEqual(node_pos.shape, (256, 256, 1))
+        self.assertEqual(node_pos.dtype, np.uint8)
+        self.assertEqual(np.min(node_pos), 0)
+        self.assertEqual(np.max(node_pos), 1)
+
+        node_degrees = x_batch[2][batch_id].numpy()
+        self.assertEqual(node_degrees.shape, (256, 256, 1))
+        self.assertEqual(node_degrees.dtype, np.uint8)
+        self.assertEqual(np.min(node_degrees), 0)
+        self.assertLessEqual(np.max(node_degrees), 4)
+
+    def test_output_data(self):
+        step_num = 0
+        batch_id = 0
+
+        _, y_batch = self.training_data[step_num]
+        adj_matr = y_batch[batch_id].numpy()
+
+        self.assertEqual(adj_matr.ndim, 3)
+        self.assertEqual(adj_matr.dtype, np.uint8)
+        self.assertEqual(np.min(adj_matr), 0)
+        self.assertLessEqual(np.max(adj_matr), 1)
 
 
 class TestDataset(unittest.TestCase):
