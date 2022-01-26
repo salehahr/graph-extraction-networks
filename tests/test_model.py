@@ -20,30 +20,23 @@ assert "tests" in cwd
 log_dir = os.path.join(cwd, "logs")
 
 
-def _get_first_images(dataset, attribute: Optional[str] = None):
+def _get_first_images(data_generator, attribute: Optional[str] = None):
     """Returns the images of the first data point in the dataset."""
     file_id = 0
     batch_id = 0
 
-    def get_skel_input(x):
-        return np.expand_dims(x[batch_id], 0)
+    x_batch, y_batch = data_generator[file_id]
 
-    if dataset.test_type == TestType.TRAINING:
-        x, y = dataset[file_id]
-        skel_input = get_skel_input(x)
+    x = x_batch[batch_id].numpy()
+    skel_input = np.expand_dims(x, 0)
 
-        node_attributes = {
-            "node_pos": np.expand_dims(y[0][batch_id], 0),
-            "degrees": np.expand_dims(y[1][batch_id], 0),
-            "node_types": np.expand_dims(y[2][batch_id], 0),
-        }
+    node_attributes = {
+        "node_pos": np.expand_dims(y_batch[0][batch_id].numpy(), 0),
+        "degrees": np.expand_dims(y_batch[1][batch_id].numpy(), 0),
+        "node_types": np.expand_dims(y_batch[2][batch_id].numpy(), 0),
+    }
 
-        return skel_input, node_attributes[attribute]
-    else:
-        x = dataset[file_id]
-        skel_input = get_skel_input(x)
-
-        return skel_input
+    return skel_input, node_attributes[attribute]
 
 
 class TestSimpleModel(unittest.TestCase):
@@ -113,6 +106,7 @@ class TestSimpleModel(unittest.TestCase):
             epochs=wandb_config.epochs,
         )
 
+    @unittest.skip("Skip wandb test.")
     def test_wandb_train(self):
         wandb.init(
             project=self.wandb.project,
@@ -123,6 +117,7 @@ class TestSimpleModel(unittest.TestCase):
         self._wandb_train()
         wandb.finish()
 
+    @unittest.skip("Skip parameter sweep.")
     def test_wandb_sweep(self):
         sweep_id = wandb.sweep(
             self.wandb.sweep_config,

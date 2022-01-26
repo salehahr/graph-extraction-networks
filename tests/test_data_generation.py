@@ -37,7 +37,7 @@ class TestNodeExtractionDG(unittest.TestCase):
         batch_id = 0
 
         x_batch, _ = self.validation_data[step_num]
-        x = x_batch[batch_id]
+        x = x_batch[batch_id].numpy()
 
         is_normalised = np.max(x) <= 1
 
@@ -48,25 +48,26 @@ class TestNodeExtractionDG(unittest.TestCase):
     def test_output_data(self):
         step_num = 0
         batch_id = 0
-        _, y = self.training_data[step_num]
 
-        node_pos = y[0][batch_id]
+        _, y_batch = self.training_data[step_num]
+
+        node_pos = y_batch[0][batch_id].numpy()
         self.assertEqual(node_pos.shape, (256, 256, 1))
         self.assertEqual(node_pos.dtype, np.uint8)
         self.assertEqual(np.min(node_pos), 0)
         self.assertEqual(np.max(node_pos), 1)
 
-        node_degrees = y[1][batch_id]
+        node_degrees = y_batch[1][batch_id].numpy()
         self.assertEqual(node_degrees.shape, (256, 256, 1))
         self.assertEqual(node_degrees.dtype, np.uint8)
-        self.assertEqual(np.min(node_pos), 0)
-        self.assertLessEqual(np.max(node_pos), 5)
+        self.assertEqual(np.min(node_degrees), 0)
+        self.assertLessEqual(np.max(node_degrees), 4)
 
-        node_types = y[2][batch_id]
+        node_types = y_batch[2][batch_id].numpy()
         self.assertEqual(node_types.shape, (256, 256, 1))
-        self.assertEqual(node_degrees.dtype, np.uint8)
-        self.assertEqual(np.min(node_pos), 0)
-        self.assertLessEqual(np.max(node_pos), 3)
+        self.assertEqual(node_types.dtype, np.uint8)
+        self.assertEqual(np.min(node_types), 0)
+        self.assertLessEqual(np.max(node_types), 3)
 
 
 class TestDataset(unittest.TestCase):
@@ -77,11 +78,16 @@ class TestDataset(unittest.TestCase):
         assert cls.config.max_files == 30
 
         cls.ds = cls.config.dataset
-        cls.list_of_files = ds_to_list(cls.ds)
+        cls.test_ds = cls.config.test_ds
+        cls.list_of_files = ds_to_list(cls.ds) + ds_to_list(cls.test_ds)
 
         print(cls.list_of_files)
 
     def test_two_takes(self):
+        """
+        Test to ensure that 'taking' from the same dataset returns the same filepaths.
+        (Sanity check for shuffled dataset)
+        """
         ds1 = self.ds.take(self.config.num_validation)
         ds2 = self.ds.take(self.config.num_validation)
         ds3 = self.ds.skip(self.config.num_validation).take(self.config.num_validation)
@@ -108,6 +114,10 @@ class TestDataset(unittest.TestCase):
             self.assertFalse(fp in list_files2)
 
     def test_train_and_val_ds(self):
+        """
+        Ensures that none of the train/val filepaths are found outside of the
+        main dataset.
+        """
         train_ds = self.config.training_ds
         val_ds = self.config.validation_ds
 
@@ -118,22 +128,30 @@ class TestDataset(unittest.TestCase):
             self.assertTrue(fp in self.list_of_files)
 
     def test_simulate_epoch(self):
+        """
+        Simulates running through the dataset for one epoch.
+        """
         batch_size = 3
         steps_per_epoch = int(len(self.ds) / batch_size)
 
-        for i in range(steps_per_epoch):
-            print(f"Batch {i}")
+        batched_ds = self.ds.batch(batch_size)
 
-            batch = self.ds.skip(i * batch_size).take(batch_size)
+        for step_num in range(steps_per_epoch):
+            print(f"Batch {step_num}")
 
+            batch = batched_ds.skip(step_num).take(1).unbatch()
             files = ds_to_list(batch)
 
             for bid, fp in enumerate(files):
-                file_id = i * batch_size + bid
+                file_id = step_num * batch_size + bid
                 self.assertEqual(fp, self.list_of_files[file_id])
 
     def test_test_dataset(self):
-        for f in ds_to_list(self.config.test_ds):
+        """
+        Makes sure that test data are only to be found in test_ds
+        and not in the train/val datasets.
+        """
+        for f in ds_to_list(self.test_ds):
             self.assertTrue("test_" in f)
 
         for f in ds_to_list(self.config.training_ds):

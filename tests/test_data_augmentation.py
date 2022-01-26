@@ -18,10 +18,10 @@ class TestDataAugmentation(unittest.TestCase):
             cls.config, network, TestType.TRAINING, augmented=False
         )
 
-        cls.img_datagen = cls._init_data_augmenter()
+        cls.img_datagen = cls._init_old_data_augmenter()
 
     @classmethod
-    def _init_data_augmenter(cls):
+    def _init_old_data_augmenter(cls):
         data_gen_args = dict(
             horizontal_flip=True,
             vertical_flip=True,
@@ -31,24 +31,28 @@ class TestDataAugmentation(unittest.TestCase):
 
     def _get_samples(self):
         """Get first output of the first training batch."""
-        # gets the first batch (>= 1 images in batch
-        # therefore the need for secondary indexing in x and the node attributes in y)
-        x, y = self.training_data[0]
-
-        # expand dimensions for inputting to ImageDataGenerator.flow()
-        x_first = np.expand_dims(x[0], axis=0)
         plot_training_sample(self.training_data, rows=1)
 
-        node_pos, degrees, node_types = y
-        node_pos_first = np.expand_dims(node_pos[0], axis=0)
-        degrees_first = np.expand_dims(degrees[0], axis=0)
-        node_types_first = np.expand_dims(node_types[0], axis=0)
+        # gets the first batch (>= 1 images in batch)
+        # therefore the need for secondary indexing in x and the node attributes in y)
+        x_batch, y_batch = self.training_data[0]
+
+        # expand dimensions for inputting to ImageDataGenerator.flow()
+        x_first = np.expand_dims(x_batch[0].numpy(), axis=0)
+
+        node_pos_first = np.expand_dims(y_batch[0][0].numpy(), axis=0)
+        degrees_first = np.expand_dims(y_batch[1][0].numpy(), axis=0)
+        node_types_first = np.expand_dims(y_batch[2][0].numpy(), axis=0)
 
         return x_first, node_pos_first, degrees_first, node_types_first
 
-    def test_data_aug(self):
-        """Visual test to check whether the data augmentation
-        transfers properly to the node attribute matrices."""
+    @unittest.skip("Now irrelevant.")
+    def test_old_data_aug(self):
+        """
+        For testing the method previously used for data augmentation.
+        (deprecated after updating DataGenerator to use more tf.data.Dataset
+        functionality)
+        """
         x, node_pos, degrees, node_types = self._get_samples()
 
         seed = 1
@@ -64,3 +68,10 @@ class TestDataAugmentation(unittest.TestCase):
         }
 
         plot_augmented(x_iter, y_iters)
+
+    def test_data_aug(self):
+        plot_training_sample(self.training_data, rows=1)
+
+        self.training_data.augmented = True
+
+        plot_training_sample(self.training_data, rows=1)
