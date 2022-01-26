@@ -143,3 +143,27 @@ class NodeExtractionDG(DataGenerator):
         node_attrs = (node_pos, degrees, node_types)
 
         return skel_imgs, node_attrs
+
+
+class GraphExtractionDG(DataGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.max_nodes: int = 300
+        self.max_adj_dim: int = int(self.max_nodes * (self.max_nodes - 1) / 2)
+
+    def __getitem__(
+        self, i: int
+    ) -> Tuple[Tuple[tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor]:
+        """Returns the i-th batch."""
+        skel_imgs, node_pos, degrees, _, adj_matrs = self._get_data(i)
+
+        # augment
+        data = [skel_imgs, node_pos, degrees, adj_matrs]
+        data = self._augment(i, data)
+
+        # rebatch
+        data = [*data[:3], data[-1].map(lambda x: tf.RaggedTensor.from_tensor(x))]
+        skel_imgs, node_pos, degrees, adj_matrs = self._rebatch(data)
+
+        return (skel_imgs, node_pos, degrees), adj_matrs
