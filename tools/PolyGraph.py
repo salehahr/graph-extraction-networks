@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import networkx as nx
@@ -14,7 +16,7 @@ class PolyGraph(nx.Graph):
         super().__init__(incoming_graph_data, **attr)
 
     @classmethod
-    def load(cls, filepath: str) -> nx.Graph:
+    def load(cls, filepath: str) -> PolyGraph:
         """Loads a graph from filepath."""
         with open(filepath, "r") as f:
             data_dict = json.load(f)

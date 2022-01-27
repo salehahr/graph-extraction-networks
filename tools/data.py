@@ -80,7 +80,7 @@ def fp_to_adj_matr(fp: str) -> np.ndarray:
     return adj_matr
 
 
-def adj_matrix_to_vec(adj_matr):
+def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     upper_tri_matr = np.triu(adj_matr)
     upper_tri_idxs = np.triu_indices(adj_matr.shape[0], k=1)
     return upper_tri_matr[upper_tri_idxs]
