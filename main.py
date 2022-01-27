@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # generate data
     training_generator = NodeExtractionDG(conf, network, TestType.TRAINING)
     validation_generator = NodeExtractionDG(conf, network, TestType.VALIDATION)
-    plot_training_sample(training_generator)
+    plot_training_sample(training_generator, network=2)
 
     # build model
     pretrained_weights = weights_fp if os.path.isfile(weights_fp) else None

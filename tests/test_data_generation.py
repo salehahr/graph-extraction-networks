@@ -30,7 +30,7 @@ class TestNodeExtractionDG(unittest.TestCase):
             self.assertIsNotNone(dataset[i])
 
     def test_plot_training_sample(self):
-        plot_training_sample(self.training_data)
+        plot_training_sample(self.training_data, network=2)
 
     def test_input_data(self):
         step_num = 0

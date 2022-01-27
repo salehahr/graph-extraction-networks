@@ -31,7 +31,7 @@ class TestDataAugmentation(unittest.TestCase):
 
     def _get_samples(self):
         """Get first output of the first training batch."""
-        plot_training_sample(self.training_data, rows=1)
+        plot_training_sample(self.training_data, network=2, rows=1)
 
         # gets the first batch (>= 1 images in batch)
         # therefore the need for secondary indexing in x and the node attributes in y)
@@ -70,8 +70,8 @@ class TestDataAugmentation(unittest.TestCase):
         plot_augmented(x_iter, y_iters)
 
     def test_data_aug(self):
-        plot_training_sample(self.training_data, rows=1)
+        plot_training_sample(self.training_data, network=2, rows=1)
 
         self.training_data.augmented = True
 
-        plot_training_sample(self.training_data, rows=1)
+        plot_training_sample(self.training_data, network=2, rows=1)
