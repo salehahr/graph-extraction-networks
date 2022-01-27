@@ -16,6 +16,16 @@ colour_enums = {
 }
 
 
+def get_rgb(img):
+    """Gets RGB image for matplotlib plots."""
+    n_channels = img.shape[2] if len(img.shape) >= 3 else 1
+
+    if n_channels == 1:
+        return img
+    else:
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+
 def classify(mask: np.ndarray) -> Tuple[np.ndarray, bool]:
     """Returns mask with integer classes."""
     is_binary = mask.shape[-1] <= 2

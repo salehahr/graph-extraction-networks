@@ -6,7 +6,14 @@ import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from tools.image import classifier_preview, classify, colour_enums, draw_circles
+from tools.data import sort_list_of_nodes
+from tools.image import (
+    classifier_preview,
+    classify,
+    colour_enums,
+    draw_circles,
+    get_rgb,
+)
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -18,6 +25,19 @@ def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
         ax.imshow(img, cmap=cmap)
         ax.set_xticks([])
         ax.set_yticks([])
+
+
+def plot_bgr_img(img, title=""):
+    n_channels = img.shape[2] if len(img.shape) >= 3 else 1
+    cmap = "gray" if n_channels == 1 else None
+
+    image = get_rgb(img)
+
+    plt.figure()
+    plt.imshow(image, cmap=cmap)
+    plt.xticks([])
+    plt.yticks([])
+    plt.title(title)
 
 
 def plot_training_sample(

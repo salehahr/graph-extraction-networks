@@ -84,3 +84,9 @@ def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     upper_tri_matr = np.triu(adj_matr)
     upper_tri_idxs = np.triu_indices(adj_matr.shape[0], k=1)
     return upper_tri_matr[upper_tri_idxs]
+
+
+def sort_list_of_nodes(unsorted: list):
+    sorted_tuple = sorted(enumerate(unsorted), key=lambda x: [x[1][0], x[1][1]])
+    indices, sorted_nodes = zip(*sorted_tuple)
+    return list(sorted_nodes)
