@@ -1,4 +1,5 @@
 import os
+from typing import List, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -86,7 +87,28 @@ def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
-def sort_list_of_nodes(unsorted: list):
+def sort_list_of_nodes(unsorted: List[List[int]]) -> List[List[int]]:
+    """
+    Returns the sorted list.
+    :param unsorted: unsorted list of nodes
+    :return: sorted list of nodes
+    """
+    _, sorted_nodes = sort_nodes(unsorted)
+    return sorted_nodes
+
+
+def sort_nodes(unsorted: List[List[int]]) -> Tuple[Tuple[int], List[List[int]]]:
+    """
+    Returns the new indices relative to the old list, as well as the sorted list.
+    :param unsorted: unsorted list of nodes
+    :return: sort indices, sorted list of nodes
+    """
     sorted_tuple = sorted(enumerate(unsorted), key=lambda x: [x[1][0], x[1][1]])
     indices, sorted_nodes = zip(*sorted_tuple)
-    return list(sorted_nodes)
+    return indices, list(sorted_nodes)
+
+
+def pos_list_from_image(img: np.ndarray):
+    # flip to convert (row, col) to (x, y)
+    pos_list_xy = np.fliplr(np.argwhere(img)).tolist()
+    return sort_list_of_nodes(pos_list_xy)

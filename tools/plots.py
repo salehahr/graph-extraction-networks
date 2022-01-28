@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from tools.data import sort_list_of_nodes
+from tools.data import pos_list_from_image
 from tools.image import (
     classifier_preview,
     classify,
@@ -111,11 +111,8 @@ def plot_sample_third_network(x, y, row: int, rows: int):
 
     # adjacency
     plt.subplot(rows, 4, get_subplot_id(row, 3))
-    node_pos_rc = x[1].numpy()[row, :, :, 0]
+    pos_list_xy = pos_list_from_image(output_matrices["node_pos"])
     adj_matr = y[row].numpy()
-
-    pos_list_xy = np.fliplr(np.argwhere(node_pos_rc)).tolist()
-    pos_list_xy = sort_list_of_nodes(pos_list_xy)
 
     plot_adj_matr(skel_img, pos_list_xy, adj_matr)
 
