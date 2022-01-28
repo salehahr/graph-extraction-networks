@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional
 
 import cv2
 import networkx as nx
@@ -157,20 +157,19 @@ def plot_adj_matr(img_skel: np.ndarray, pos: list, adjacency: np.ndarray) -> Non
     nx.draw(graph, pos=pos_dict, node_size=2, node_color="r", edge_color="g", width=1)
 
 
-def plot_augmented(x_iter, y_iter):
-    base_imgs = plot_augmented_inputs(x_iter, "skeleton", cmap="gray")
-    plot_augmented_outputs(y_iter, base_imgs)
+def plot_augmented(x: List[np.ndarray], y: Dict[str, np.ndarray]):
+    base_imgs = plot_augmented_inputs(x, "skeleton", cmap="gray")
+    plot_augmented_outputs(y, base_imgs)
 
 
-def plot_augmented_inputs(iterator, title: str = "", cmap=None):
-    base_imgs = []
-    for i in range(4):
+def plot_augmented_inputs(
+    b_imgs: List[np.ndarray], title: str = "", cmap=None
+) -> List[np.ndarray]:
+    base_imgs = [batch[0] for batch in b_imgs]
+
+    for i, img in enumerate(base_imgs):
         plt.subplot(220 + 1 + i)
-        batch = iterator.next()
-        image = batch[0]
-
-        base_imgs.append(image)
-        plot_img(image, cmap=cmap)
+        plot_img(img, cmap=cmap)
 
     plt.suptitle(title)
     plt.show()
@@ -178,21 +177,33 @@ def plot_augmented_inputs(iterator, title: str = "", cmap=None):
     return base_imgs
 
 
-def plot_augmented_outputs(output_iterators, base_imgs):
+def plot_augmented_outputs(
+    graph_data: Dict[str, np.ndarray], base_imgs: List[np.ndarray]
+):
     """Scans the matrices for integer values (nodes)
     and plots markers according to the node attribute."""
-    for k, output_iter in output_iterators.items():
-        for i in range(4):
-            plt.subplot(220 + 1 + i)
-            batch = output_iter.next()
-            out_matrix = np.round(batch[0].squeeze()).astype("uint8")
 
+    for k, data in graph_data.items():
+        for i, img in enumerate(data):
+            plt.subplot(220 + 1 + i)
+
+            out_matrix = np.round(img[0].squeeze()).astype("uint8")
             base_img = cv2.cvtColor(base_imgs[i] * 255, cv2.COLOR_GRAY2BGR).astype(
                 np.uint8
             )
-            out_image = draw_circles(base_img, out_matrix, colour_enums[k])
-            out_image = cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB)
-            plot_img(out_image)
+
+            if k == "adj_matr":
+                node_pos = graph_data["node_pos"][i][0]
+                node_pos = np.round(node_pos.squeeze().astype("uint8"))
+                plot_adj_matr(
+                    base_img,
+                    pos_list_from_image(node_pos),
+                    out_matrix,
+                )
+            else:
+                out_image = draw_circles(base_img, out_matrix, colour_enums[k])
+                out_image = cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB)
+                plot_img(out_image)
 
         plt.suptitle(k)
         plt.show()
