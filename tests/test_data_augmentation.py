@@ -1,9 +1,11 @@
 import unittest
 
+import networkx as nx
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 
 from tools import Config, GraphExtractionDG, NodeExtractionDG, TestType
+from tools.data import sort_nodes
 from tools.plots import plot_augmented, plot_training_sample
 
 
@@ -127,3 +129,103 @@ class TestThirdNetworkDataAugmentation(TestDataAugmentation):
         }
 
         plot_augmented(skel_img_aug, graph_aug)
+
+
+class TestAdjacencyMatrix(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.min_x, cls.max_x = 1, 7
+        cls.min_y, cls.max_y = 1, 6
+
+        cls.diff_x = cls.max_x - cls.min_x
+        cls.diff_y = cls.max_y - cls.min_y
+
+        nodes_orig = [
+            [1, 1],
+            [1, 5],
+            [2, 3],
+            [3, 5],
+            [4, 1],
+            [5, 6],
+            [6, 4],
+            [7, 2],
+            [7, 5],
+        ]
+        cls.edges = [
+            [[1, 1], [2, 3]],
+            [[1, 5], [2, 3]],
+            [[2, 3], [4, 1]],
+            [[2, 3], [5, 6]],
+            [[3, 5], [6, 4]],
+            [[7, 2], [7, 5]],
+        ]
+        cls.idx_orig, cls.nodes_orig = sort_nodes(nodes_orig)
+        cls.num_nodes = len(nodes_orig)
+        cls.graph = cls.create_graph()
+        cls.A = nx.to_numpy_array(cls.graph).astype(np.uint8)
+
+        print("Original A:")
+        print(cls.A)
+
+    @classmethod
+    def create_graph(cls) -> nx.Graph:
+        graph = nx.Graph()
+
+        # define nodes with attribute position
+        for i, xy in enumerate(cls.nodes_orig):
+            graph.add_node(i, pos=tuple(xy))
+
+        # define edges with attributes: length
+        for edge in cls.edges:
+            start_xy, end_xy = edge
+
+            startidx = cls.nodes_orig.index(start_xy)
+            endidx = cls.nodes_orig.index(end_xy)
+
+            graph.add_edge(startidx, endidx)
+
+        return graph
+
+    def _test_transform(self, A: np.ndarray, transform_function) -> np.ndarray:
+        nodes_new = transform_function(self.nodes_orig)
+        idx_new, nodes_new_sorted = sort_nodes(nodes_new)
+
+        I = np.identity(self.num_nodes, dtype=np.uint8)
+        P = np.take(I, idx_new, axis=0)
+        A_new = P @ A @ np.transpose(P)
+
+        return A_new
+
+    def test_horz_flip(self):
+        print("Horizontal flip")
+        A_horz = self._test_transform(self.A, self._apply_horz_flip)
+        print(A_horz)
+
+    def test_vert_flip(self):
+        print("Vertical flip")
+        A_vert = self._test_transform(self.A, self._apply_vert_flip)
+        print(A_vert)
+
+    def test_both_flips(self):
+        print("Both flips")
+        A = self._test_transform(self.A, self._apply_vert_flip)
+        A = self._test_transform(A, self._apply_horz_flip)
+        print(A)
+
+    def _apply_horz_flip(self, nodes: list) -> list:
+        """Only columns/x-coords are flipped."""
+
+        def flip_x(xy):
+            x, y = xy
+            return [self.max_x + self.min_x - x, y]
+
+        return list(map(flip_x, nodes))
+
+    def _apply_vert_flip(self, nodes: list) -> list:
+        """Only rows/y-coords are flipped."""
+
+        def flip_y(xy):
+            x, y = xy
+            return [x, self.max_y + self.min_y - y]
+
+        return list(map(flip_y, nodes))
