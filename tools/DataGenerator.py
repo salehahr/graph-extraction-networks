@@ -1,3 +1,4 @@
+import random
 from abc import ABC
 from typing import List, Tuple
 
@@ -100,16 +101,20 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 
         return node_pos, degrees, node_types, adj_matr
 
-    def _augment(self, seed: int, data: List[tf.data.Dataset]):
+    def _augment(self, data: List[tf.data.Dataset]):
+        seed1 = random.randint(0, 100)
+        seed2 = random.randint(0, 100)
+        print((seed1, seed2))
+
         def augment(x):
-            return self._augment_tensor(x, seed=seed)
+            return self._augment_tensor(x, seeds=(seed1, seed2))
 
         return [d.map(augment) for d in data] if self.augmented else data
 
     @staticmethod
-    def _augment_tensor(x: tf.Tensor, seed: int) -> tf.Tensor:
-        x = tf.image.random_flip_left_right(x, seed=seed)
-        x = tf.image.random_flip_up_down(x, seed=seed)
+    def _augment_tensor(x: tf.Tensor, seeds: tuple) -> tf.Tensor:
+        x = tf.image.random_flip_left_right(x, seed=seeds[0])
+        x = tf.image.random_flip_up_down(x, seed=seeds[1])
         return x
 
     def _rebatch(self, data: List[tf.data.Dataset]) -> List[tf.Tensor]:
@@ -135,14 +140,13 @@ class NodeExtractionDG(DataGenerator):
         skel_imgs, node_pos, degrees, node_types, _ = self._get_data(i)
 
         # augment
-        input_data = [skel_imgs, node_pos, degrees, node_types]
-        input_data = self._augment(i, input_data)
+        data = [skel_imgs, node_pos, degrees, node_types]
+        data = self._augment(data) if self.augmented else data
 
         # rebatch
-        skel_imgs, node_pos, degrees, node_types = self._rebatch(input_data)
-        node_attrs = (node_pos, degrees, node_types)
+        skel_imgs, node_pos, degrees, node_types = self._rebatch(data)
 
-        return skel_imgs, node_attrs
+        return skel_imgs, (node_pos, degrees, node_types)
 
 
 class GraphExtractionDG(DataGenerator):
@@ -160,7 +164,7 @@ class GraphExtractionDG(DataGenerator):
 
         # augment
         data = [skel_imgs, node_pos, degrees, adj_matrs]
-        data = self._augment(i, data)
+        data = self._augment(data) if self.augmented else data
 
         # rebatch
         data = [*data[:3], data[-1].map(lambda x: tf.RaggedTensor.from_tensor(x))]
