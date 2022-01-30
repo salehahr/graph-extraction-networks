@@ -137,9 +137,6 @@ class TestAdjacencyMatrix(unittest.TestCase):
         cls.min_x, cls.max_x = 1, 7
         cls.min_y, cls.max_y = 1, 6
 
-        cls.diff_x = cls.max_x - cls.min_x
-        cls.diff_y = cls.max_y - cls.min_y
-
         nodes_orig = [
             [1, 1],
             [1, 5],
@@ -161,11 +158,12 @@ class TestAdjacencyMatrix(unittest.TestCase):
         ]
         cls.idx_orig, cls.nodes_orig = sort_nodes(nodes_orig)
         cls.num_nodes = len(nodes_orig)
-        cls.graph = cls.create_graph()
-        cls.A = nx.to_numpy_array(cls.graph).astype(np.uint8)
 
-        print("Original A:")
-        print(cls.A)
+        graph = cls.create_graph()
+        cls.A = nx.to_numpy_array(graph).astype(np.uint8)
+
+        print(f"Nodes:\n{cls.nodes_orig}")
+        print(f"Original A:\n{cls.A}")
 
     @classmethod
     def create_graph(cls) -> nx.Graph:
@@ -186,31 +184,113 @@ class TestAdjacencyMatrix(unittest.TestCase):
 
         return graph
 
-    def _test_transform(self, A: np.ndarray, transform_function) -> np.ndarray:
-        nodes_new = transform_function(self.nodes_orig)
-        idx_new, nodes_new_sorted = sort_nodes(nodes_new)
-
+    def _transform_A(self, A: np.ndarray, idx_trans_sorted: np.ndarray) -> np.ndarray:
         I = np.identity(self.num_nodes, dtype=np.uint8)
-        P = np.take(I, idx_new, axis=0)
-        A_new = P @ A @ np.transpose(P)
+        P = np.take(I, idx_trans_sorted, axis=0)
+        return P @ A @ np.transpose(P)
 
-        return A_new
+    def _print_transformed_nodes(self, nodes, idx_new):
+        for i, n, i_ts in zip(self.idx_orig, nodes, idx_new):
+            print(f"{i}: {n} --> {i_ts}")
 
     def test_horz_flip(self):
         print("Horizontal flip")
-        A_horz = self._test_transform(self.A, self._apply_horz_flip)
-        print(A_horz)
+
+        nodes_trans = self._apply_horz_flip(self.nodes_orig)
+        idx_sorted, nodes_trans_sorted = sort_nodes(nodes_trans)
+        idx_trans_sorted = np.take(self.idx_orig, idx_sorted)
+
+        A_trans = self._transform_A(self.A, idx_trans_sorted)
+        self._print_transformed_nodes(nodes_trans, idx_trans_sorted)
+        print(f"Sorted:\n{nodes_trans_sorted}")
+        print(A_trans)
+
+        np.testing.assert_equal(
+            A_trans,
+            np.array(
+                [
+                    [0, 1, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                ]
+            ),
+        )
 
     def test_vert_flip(self):
         print("Vertical flip")
-        A_vert = self._test_transform(self.A, self._apply_vert_flip)
-        print(A_vert)
+
+        nodes_trans = self._apply_vert_flip(self.nodes_orig)
+        idx_sorted, nodes_trans_sorted = sort_nodes(nodes_trans)
+        idx_trans_sorted = np.take(self.idx_orig, idx_sorted)
+
+        A_trans = self._transform_A(self.A, idx_trans_sorted)
+        self._print_transformed_nodes(nodes_trans, idx_trans_sorted)
+        print(f"Sorted:\n{nodes_trans_sorted}")
+        print(A_trans)
+
+        np.testing.assert_equal(
+            A_trans,
+            np.array(
+                [
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 1, 0],
+                ]
+            ),
+        )
 
     def test_both_flips(self):
-        print("Both flips")
-        A = self._test_transform(self.A, self._apply_vert_flip)
-        A = self._test_transform(A, self._apply_horz_flip)
-        print(A)
+        print("Both flips: vertical, then horizontal")
+
+        print("\tVertical flip")
+
+        nodes_trans1 = self._apply_vert_flip(self.nodes_orig)
+        idx_sorted, nodes_trans1_sorted = sort_nodes(nodes_trans1)
+        idx_trans1_sorted = np.take(self.idx_orig, idx_sorted)
+
+        A_trans1 = self._transform_A(self.A, idx_trans1_sorted)
+        self._print_transformed_nodes(nodes_trans1, idx_trans1_sorted)
+        print(f"Sorted:\n{nodes_trans1_sorted}")
+
+        print("\tHorizontal flip")
+
+        nodes_trans2 = self._apply_horz_flip(nodes_trans1_sorted)
+        idx_sorted, nodes_trans2_sorted = sort_nodes(nodes_trans2)
+        idx_trans2_sorted = np.take(idx_trans1_sorted, idx_sorted)
+
+        A_trans2 = self._transform_A(A_trans1, idx_trans2_sorted)
+        self._print_transformed_nodes(nodes_trans2, idx_trans2_sorted)
+        print(f"Sorted:\n{nodes_trans2_sorted}")
+        print(A_trans2)
+
+        np.testing.assert_equal(
+            A_trans2,
+            np.array(
+                [
+                    [0, 1, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                ]
+            ),
+        )
 
     def _apply_horz_flip(self, nodes: list) -> list:
         """Only columns/x-coords are flipped."""
