@@ -60,6 +60,15 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         skel_imgs = skel_fps.map(to_skel_img, num_parallel_calls=tf.data.AUTOTUNE)
         node_pos, degrees, node_types, adj_matr = self._get_graph_data(graph_fps)
 
+        def set_shape(img: tf.Tensor) -> tf.Tensor:
+            img.set_shape([*self.img_dims, 1])
+            return img
+
+        skel_imgs = skel_imgs.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
+        node_pos = node_pos.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
+        degrees = degrees.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
+        node_types = node_types.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
+
         return skel_imgs, node_pos, degrees, node_types, adj_matr
 
     def _get_batch_fps(self, i: int) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
