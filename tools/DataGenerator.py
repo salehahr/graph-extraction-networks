@@ -5,8 +5,18 @@ from typing import List, Tuple
 import numpy as np
 import tensorflow as tf
 
-from tools.data import fp_to_adj_matr, fp_to_grayscale_img, fp_to_node_attributes
+from tools.adj_matr import transform_adj_matr
+from tools.data import (
+    fp_to_adj_matr,
+    fp_to_grayscale_img,
+    fp_to_node_attributes,
+    get_data_at_xy,
+    sorted_pos_list_from_image,
+    unsorted_pos_list_from_image,
+)
 
+from .image import gen_pos_indices_img
+from .sort import get_sort_indices
 from .TestType import TestType
 
 
@@ -98,11 +108,11 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
                 func=fp_to_node_attributes, inp=[fp, self.img_dims[0]], Tout=tf.uint8
             )
 
-        def to_adj_matr(fp: str) -> np.ndarray:
+        def to_adj_matr(fp: str):
             return tf.numpy_function(func=fp_to_adj_matr, inp=[fp], Tout=tf.uint8)
 
         node_attrs = graph_fps.map(to_node_attributes).unbatch()
-        adj_matr = graph_fps.map(to_adj_matr)
+        adj_matr = graph_fps.map(to_adj_matr).map(lambda x: tf.cast(x, tf.int32))
 
         node_pos = node_attrs.window(1, shift=3).flat_map(lambda x: x)
         degrees = node_attrs.skip(1).window(1, shift=3).flat_map(lambda x: x)
@@ -113,15 +123,14 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
     def _augment(self, data: List[tf.data.Dataset]):
         seed1 = random.randint(0, 100)
         seed2 = random.randint(0, 100)
-        print((seed1, seed2))
 
         def augment(x):
-            return self._augment_tensor(x, seeds=(seed1, seed2))
+            return self._flip_tensor(x, seeds=(seed1, seed2))
 
-        return [d.map(augment) for d in data] if self.augmented else data
+        return [d.map(augment, deterministic=True) for d in data]
 
     @staticmethod
-    def _augment_tensor(x: tf.Tensor, seeds: tuple) -> tf.Tensor:
+    def _flip_tensor(x: tf.Tensor, seeds: tuple) -> tf.Tensor:
         x = tf.image.random_flip_left_right(x, seed=seeds[0])
         x = tf.image.random_flip_up_down(x, seed=seeds[1])
         return x
@@ -170,13 +179,57 @@ class GraphExtractionDG(DataGenerator):
     ) -> Tuple[Tuple[tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor]:
         """Returns the i-th batch."""
         skel_imgs, node_pos, degrees, _, adj_matrs = self._get_data(i)
+        pos_idx_img = self._to_pos_indices_img(node_pos)
 
         # augment
-        data = [skel_imgs, node_pos, degrees, adj_matrs]
+        data = [skel_imgs, node_pos, degrees, pos_idx_img]
         data = self._augment(data) if self.augmented else data
 
+        pos_idx_aug_img = data[-1]
+        adj_matrs = self._augment_adj_matr(adj_matrs, pos_idx_aug_img)
+
         # rebatch
-        data = [*data[:3], data[-1].map(lambda x: tf.RaggedTensor.from_tensor(x))]
+        data = [*data[:3], adj_matrs]
         skel_imgs, node_pos, degrees, adj_matrs = self._rebatch(data)
 
         return (skel_imgs, node_pos, degrees), adj_matrs
+
+    def _to_pos_indices_img(self, node_pos: tf.data.Dataset) -> tf.data.Dataset:
+        """Generates an image dataset containing the integer indices
+        of the node positions, at the corresponding (x,y) coordinates."""
+
+        # get pos list from node_pos image
+        pos_list = node_pos.map(
+            sorted_pos_list_from_image, num_parallel_calls=tf.data.AUTOTUNE
+        )
+
+        # generate a range of values [0, n_nodes) = original node indices
+        def gen_idx(pos: tf.Tensor):
+            n_nodes = tf.shape(pos)[0]
+            return tf.range(start=0, limit=n_nodes)
+
+        idx = pos_list.map(gen_idx, num_parallel_calls=tf.data.AUTOTUNE)
+
+        def to_img(i, xy):
+            return tf.numpy_function(
+                func=gen_pos_indices_img, inp=[i, xy, self.img_dims[0]], Tout=tf.uint32
+            )
+
+        return tf.data.Dataset.zip((idx, pos_list)).map(
+            to_img, num_parallel_calls=tf.data.AUTOTUNE
+        )
+
+    @staticmethod
+    def _augment_adj_matr(
+        adj_matr: tf.data.Dataset, pos_idx_aug_img: tf.data.Dataset
+    ) -> tf.data.Dataset:
+        """Transforms adjacency matrix based on new node positions
+        and returns it in RaggedTensor format."""
+
+        def get_idx(img):
+            return tf.numpy_function(func=get_data_at_xy, inp=[img], Tout=tf.uint32)
+
+        aug_sort_indices = pos_idx_aug_img.map(get_idx)
+
+        A_pos = tf.data.Dataset.zip((adj_matr, aug_sort_indices))
+        return A_pos.map(transform_adj_matr, num_parallel_calls=tf.data.AUTOTUNE)

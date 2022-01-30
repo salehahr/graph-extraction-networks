@@ -115,8 +115,8 @@ class TestGraphExtractionDG(TestNodeExtractionDG):
         _, y_batch = self.training_data[step_num]
         adj_matr = y_batch[batch_id].numpy()
 
-        self.assertEqual(adj_matr.ndim, 3)
-        self.assertEqual(adj_matr.dtype, np.uint8)
+        self.assertEqual(adj_matr.ndim, 2)
+        self.assertEqual(adj_matr.dtype, np.int32)
         self.assertEqual(np.min(adj_matr), 0)
         self.assertLessEqual(np.max(adj_matr), 1)
 

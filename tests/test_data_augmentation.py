@@ -5,8 +5,9 @@ import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 
 from tools import Config, GraphExtractionDG, NodeExtractionDG, TestType
-from tools.data import sort_nodes
+from tools.adj_matr import transform_A
 from tools.plots import plot_augmented, plot_training_sample
+from tools.sort import sort_nodes
 
 
 class TestDataAugmentation(unittest.TestCase):
@@ -61,6 +62,7 @@ class TestDataAugmentation(unittest.TestCase):
         # gets the first batch (>= 1 images in batch)
         return self.training_data[0]
 
+    @unittest.skip("Deprecated.")
     def test_old_data_aug(self):
         """
         For testing the method previously used for data augmentation.
@@ -114,21 +116,6 @@ class TestThirdNetworkDataAugmentation(TestDataAugmentation):
         adj_matr_first = np.expand_dims(y_batch[0].numpy(), axis=0)
 
         return skel_img_first, node_pos_first, degrees_first, adj_matr_first
-
-    def test_old_data_aug(self):
-        """
-        For testing the method previously used for data augmentation.
-        """
-        skel_img, node_pos, degrees, adj_matr = self._get_samples()
-
-        skel_img_aug = self._aug_imgs(skel_img)
-        graph_aug = {
-            "node_pos": self._aug_imgs(node_pos),
-            "degrees": self._aug_imgs(degrees),
-            "adj_matr": self._aug_imgs(adj_matr),
-        }
-
-        plot_augmented(skel_img_aug, graph_aug)
 
 
 class TestAdjacencyMatrix(unittest.TestCase):
@@ -184,11 +171,6 @@ class TestAdjacencyMatrix(unittest.TestCase):
 
         return graph
 
-    def _transform_A(self, A: np.ndarray, idx_trans_sorted: np.ndarray) -> np.ndarray:
-        I = np.identity(self.num_nodes, dtype=np.uint8)
-        P = np.take(I, idx_trans_sorted, axis=0)
-        return P @ A @ np.transpose(P)
-
     def _print_transformed_nodes(self, nodes, idx_new):
         for i, n, i_ts in zip(self.idx_orig, nodes, idx_new):
             print(f"{i}: {n} --> {i_ts}")
@@ -200,7 +182,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
         idx_sorted, nodes_trans_sorted = sort_nodes(nodes_trans)
         idx_trans_sorted = np.take(self.idx_orig, idx_sorted)
 
-        A_trans = self._transform_A(self.A, idx_trans_sorted)
+        A_trans = transform_A(self.A, idx_trans_sorted)
         self._print_transformed_nodes(nodes_trans, idx_trans_sorted)
         print(f"Sorted:\n{nodes_trans_sorted}")
         print(A_trans)
@@ -229,7 +211,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
         idx_sorted, nodes_trans_sorted = sort_nodes(nodes_trans)
         idx_trans_sorted = np.take(self.idx_orig, idx_sorted)
 
-        A_trans = self._transform_A(self.A, idx_trans_sorted)
+        A_trans = transform_A(self.A, idx_trans_sorted)
         self._print_transformed_nodes(nodes_trans, idx_trans_sorted)
         print(f"Sorted:\n{nodes_trans_sorted}")
         print(A_trans)
@@ -260,7 +242,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
         idx_sorted, nodes_trans1_sorted = sort_nodes(nodes_trans1)
         idx_trans1_sorted = np.take(self.idx_orig, idx_sorted)
 
-        A_trans1 = self._transform_A(self.A, idx_trans1_sorted)
+        A_trans1 = transform_A(self.A, idx_trans1_sorted)
         self._print_transformed_nodes(nodes_trans1, idx_trans1_sorted)
         print(f"Sorted:\n{nodes_trans1_sorted}")
 
@@ -270,7 +252,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
         idx_sorted, nodes_trans2_sorted = sort_nodes(nodes_trans2)
         idx_trans2_sorted = np.take(idx_trans1_sorted, idx_sorted)
 
-        A_trans2 = self._transform_A(A_trans1, idx_trans2_sorted)
+        A_trans2 = transform_A(A_trans1, idx_trans2_sorted)
         self._print_transformed_nodes(nodes_trans2, idx_trans2_sorted)
         print(f"Sorted:\n{nodes_trans2_sorted}")
         print(A_trans2)

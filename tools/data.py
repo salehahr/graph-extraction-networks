@@ -1,10 +1,10 @@
 import os
-from typing import List, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
 
 from tools.PolyGraph import PolyGraph
+from tools.sort import get_sort_indices, sort_list_of_nodes
 
 
 def get_skeletonised_ds(
@@ -63,7 +63,7 @@ def graph_to_node_attributes(graph: PolyGraph, dim: int) -> np.ndarray:
         degrees[row][col] = graph.num_node_neighbours[i]
         node_types[row][col] = graph.node_types[i]
 
-    def cap_degrees(deg_matrix):
+    def cap_degrees(deg_matrix: np.ndarray) -> np.ndarray:
         """Cap values at 4."""
         cap_value = 4
         deg_matrix[deg_matrix > cap_value] = cap_value
@@ -81,36 +81,28 @@ def fp_to_adj_matr(fp: str) -> np.ndarray:
     return adj_matr
 
 
-def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
-    upper_tri_matr = np.triu(adj_matr)
-    upper_tri_idxs = np.triu_indices(adj_matr.shape[0], k=1)
-    return upper_tri_matr[upper_tri_idxs]
-
-
-def sort_list_of_nodes(unsorted: Union[List[List[int]], np.ndarray]) -> np.ndarray:
-    """
-    Returns the sorted nodes.
-    :param unsorted: unsorted nodes
-    :return: sorted nodes
-    """
-    _, sorted_nodes = sort_nodes(unsorted)
-    return sorted_nodes
-
-
-def sort_nodes(
-    unsorted: Union[List[List[int]], np.ndarray]
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Returns the new indices relative to the old list, as well as the sorted list.
-    :param unsorted: unsorted nodes
-    :return: sort indices, sorted nodes
-    """
-    sorted_tuple = sorted(enumerate(unsorted), key=lambda x: [x[1][0], x[1][1]])
-    indices, sorted_nodes = zip(*sorted_tuple)
-    return np.array(indices), np.array(sorted_nodes)
-
-
-def pos_list_from_image(img: np.ndarray):
+def pos_list_from_image(node_pos_img: np.ndarray) -> np.ndarray:
+    """Gets list of coordinates from the node_pos image."""
     # flip to convert (row, col) to (x, y)
-    pos_list_xy = np.fliplr(np.argwhere(img)).tolist()
+    pos_list_xy = np.fliplr(np.argwhere(node_pos_img)).tolist()
     return sort_list_of_nodes(pos_list_xy)
+
+
+def sorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:
+    """Extracts the sorted xy coordinates from the node_pos image."""
+    xy_unsorted = unsorted_pos_list_from_image(node_pos_img)
+    sort_indices = get_sort_indices(xy_unsorted)
+    return tf.gather(xy_unsorted, sort_indices)
+
+
+def unsorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:
+    """Extracts the (unsorted) xy coordinates from the node_pos image."""
+    node_pos_img = tf.cast(tf.squeeze(node_pos_img), tf.uint8)
+    return tf.reverse(tf.where(node_pos_img), axis=[1])
+
+
+def get_data_at_xy(matr: np.ndarray) -> np.ndarray:
+    """Extracts data from a 2D matrix at the given (x,y) coordinate."""
+    matr = matr.squeeze()
+    rc = np.fliplr(pos_list_from_image(matr))
+    return matr[rc[:, 0], rc[:, 1]] - 1

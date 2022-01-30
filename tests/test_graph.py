@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tools import PolyGraph
-from tools.data import fp_to_adj_matr, fp_to_node_attributes, sort_list_of_nodes
+from tools.data import fp_to_adj_matr, fp_to_node_attributes
 from tools.files import get_random_image, get_random_video_path
 from tools.plots import plot_adj_matr, plot_bgr_img
+from tools.sort import sort_list_of_nodes
 
 data_path = os.path.join(os.getcwd(), "../data/test")
 
