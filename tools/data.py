@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -87,7 +87,7 @@ def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
-def sort_list_of_nodes(unsorted: List[List[int]]) -> List[List[int]]:
+def sort_list_of_nodes(unsorted: Union[List[List[int]], np.ndarray]) -> List[List[int]]:
     """
     Returns the sorted list.
     :param unsorted: unsorted list of nodes
@@ -97,7 +97,9 @@ def sort_list_of_nodes(unsorted: List[List[int]]) -> List[List[int]]:
     return sorted_nodes
 
 
-def sort_nodes(unsorted: List[List[int]]) -> Tuple[Tuple[int], List[List[int]]]:
+def sort_nodes(
+    unsorted: Union[List[List[int]], np.ndarray]
+) -> Tuple[Tuple[int], List[List[int]]]:
     """
     Returns the new indices relative to the old list, as well as the sorted list.
     :param unsorted: unsorted list of nodes
