@@ -87,11 +87,11 @@ def adj_matrix_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
-def sort_list_of_nodes(unsorted: Union[List[List[int]], np.ndarray]) -> List[List[int]]:
+def sort_list_of_nodes(unsorted: Union[List[List[int]], np.ndarray]) -> np.ndarray:
     """
-    Returns the sorted list.
-    :param unsorted: unsorted list of nodes
-    :return: sorted list of nodes
+    Returns the sorted nodes.
+    :param unsorted: unsorted nodes
+    :return: sorted nodes
     """
     _, sorted_nodes = sort_nodes(unsorted)
     return sorted_nodes
@@ -99,15 +99,15 @@ def sort_list_of_nodes(unsorted: Union[List[List[int]], np.ndarray]) -> List[Lis
 
 def sort_nodes(
     unsorted: Union[List[List[int]], np.ndarray]
-) -> Tuple[Tuple[int], List[List[int]]]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Returns the new indices relative to the old list, as well as the sorted list.
-    :param unsorted: unsorted list of nodes
-    :return: sort indices, sorted list of nodes
+    :param unsorted: unsorted nodes
+    :return: sort indices, sorted nodes
     """
     sorted_tuple = sorted(enumerate(unsorted), key=lambda x: [x[1][0], x[1][1]])
     indices, sorted_nodes = zip(*sorted_tuple)
-    return indices, list(sorted_nodes)
+    return np.array(indices), np.array(sorted_nodes)
 
 
 def pos_list_from_image(img: np.ndarray):

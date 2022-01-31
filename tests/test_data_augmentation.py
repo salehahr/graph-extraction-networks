@@ -177,8 +177,8 @@ class TestAdjacencyMatrix(unittest.TestCase):
         for edge in cls.edges:
             start_xy, end_xy = edge
 
-            startidx = cls.nodes_orig.index(start_xy)
-            endidx = cls.nodes_orig.index(end_xy)
+            startidx = cls.nodes_orig.tolist().index(start_xy)
+            endidx = cls.nodes_orig.tolist().index(end_xy)
 
             graph.add_edge(startidx, endidx)
 

@@ -83,13 +83,12 @@ class TestGraph(RandomImage):
         def is_sorted_ascending(arr):
             return all(arr[i] <= arr[i + 1] for i in range(len(arr) - 1))
 
-        if self.positions:
-            rows, cols = zip(*self.positions)
-            print(self.positions)
+        rows, cols = zip(*self.positions)
+        print(self.positions)
 
-            is_sorted_row = is_sorted_ascending(rows)
+        is_sorted_row = is_sorted_ascending(rows)
 
-            self.assertTrue(is_sorted_row)
+        self.assertTrue(is_sorted_row)
 
     def test_adjacency_matrix_skeletonised_match(self):
         if self.adj_matr is not None:
