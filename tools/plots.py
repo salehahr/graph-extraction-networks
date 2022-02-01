@@ -15,6 +15,7 @@ from tools.image import (
     get_rgb,
 )
 from tools.NetworkType import NetworkType
+from tools.node_classifiers import NodeDegrees
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -55,72 +56,80 @@ def plot_training_sample(
     :param rows: maximum number of data points to plot
     :return:
     """
-    b_inputs, b_outputs = data_generator[step_num]
-
     rows = data_generator.batch_size if rows > data_generator.batch_size else rows
 
     if network == NetworkType.NODES_NN:
         plot_fcn = plot_sample_nodes_nn
     elif network == NetworkType.ADJ_MATR_NN:
         plot_fcn = plot_sample_adj_nn
+    elif network == NetworkType.EDGE_NN:
+        plot_fcn = plot_sample_edge_nn
+    else:
+        raise Exception
 
     for row in range(rows):
         plt.figure(0)
-        plot_fcn(b_inputs, b_outputs, row, rows)
+        plot_fcn(data_generator, step_num, row, rows)
 
     plt.show()
 
 
-def plot_sample_nodes_nn(x: tf.Tensor, y: tuple, row: int = 0, rows: int = 0):
+def plot_sample_nodes_nn(data_generator, step_num: int, row: int = 0, rows: int = 0):
     input_names = ["skel"]
     output_names = ["node_pos", "degrees", "node_types"]
     data_names = input_names + output_names
+    num_cols = len(data_names)
 
     set_plot_title(data_names, row, rows)
 
+    b_skel_img, b_y = data_generator[step_num]
+
     # input
-    plt.subplot(rows, 4, get_subplot_id(row, 0))
-    input_img = np.float32(x.numpy()[row, :, :, :])
+    plt.subplot(rows, 4, get_subplot_id(row, 0, num_cols=num_cols))
+    input_img = np.float32(b_skel_img[row].numpy())
     plot_img(input_img, cmap="gray")
 
     # outputs
     output_matrices = {
-        attr: y[i].numpy()[row, :, :, 0] for i, attr in enumerate(output_names)
+        attr: b_y[i].numpy()[row, :, :, 0] for i, attr in enumerate(output_names)
     }
     output_images = classifier_preview(output_matrices, input_img * 255)
 
     for col, attr in enumerate(output_names):
-        plt.subplot(rows, 4, get_subplot_id(row, col + 1))
+        plt.subplot(rows, 4, get_subplot_id(row, col + 1, num_cols=num_cols))
         plot_img(output_images[attr])
 
 
-def plot_sample_adj_nn(x, y, row: int, rows: int):
+def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int):
     input_names = ["skel", "node_pos", "degrees"]
     output_names = ["adj_matr"]
     data_names = input_names + output_names
+    num_cols = len(data_names)
 
     set_plot_title(data_names, row, rows)
 
+    b_x, b_y = data_generator[step_num]
+
     # skel_image
-    plt.subplot(rows, 4, get_subplot_id(row, 0))
-    skel_img = np.float32(x[0].numpy()[row, :, :, :])
+    plt.subplot(rows, 4, get_subplot_id(row, 0, num_cols=num_cols))
+    skel_img = np.float32(b_x[0].numpy()[row, :, :, :])
     plot_img(skel_img, cmap="gray")
 
     # node_attributes
     output_matrices = {
-        attr: x[i].numpy()[row, :, :, 0]
+        attr: b_x[i].numpy()[row, :, :, 0]
         for i, attr in enumerate(input_names[1:], start=1)
     }
     output_images = classifier_preview(output_matrices, skel_img * 255)
 
     for col, attr in enumerate(input_names[1:], start=1):
-        plt.subplot(rows, 4, get_subplot_id(row, col))
+        plt.subplot(rows, 4, get_subplot_id(row, col, num_cols=num_cols))
         plot_img(output_images[attr])
 
-    # adjacency
-    plt.subplot(rows, 4, get_subplot_id(row, 3))
+    # adjacency matrix
+    plt.subplot(rows, 4, get_subplot_id(row, 3, num_cols=num_cols))
     pos_list_xy = pos_list_from_image(output_matrices["node_pos"])
-    adj_matr = y[row].numpy()
+    adj_matr = b_y[row].numpy()
 
     plot_adj_matr(skel_img, pos_list_xy, adj_matr)
 
@@ -129,16 +138,55 @@ def plot_sample_adj_nn(x, y, row: int, rows: int):
     plot_adj_matr(skel_img, pos_list_xy, adj_matr)
 
 
+def plot_sample_edge_nn(data_generator, step_num: int, row: int, num_rows: int):
+    num_cols = 2
+    set_plot_title(["path", "path from DataGen"], row, num_rows)
+
+    (skel_img, combos), (adjacencies, paths) = data_generator[step_num]
+    pos_list = data_generator.pos_list.numpy()
+
+    skel_img = np.float32(skel_img.numpy())
+    adjacencies = adjacencies.numpy()
+    combos = combos.numpy()
+    paths = [p.numpy() for p in paths]
+
+    # path
+    rc1, rc2 = np.fliplr(pos_list[combos[row]])
+    rows = np.sort([rc1[0], rc2[0]])
+    cols = np.sort([rc1[1], rc2[1]])
+
+    img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1]
+    plt.subplot(num_rows, num_cols, get_subplot_id(row, 0, num_cols))
+    plot_img(img_section, cmap="gray")
+    plt.xlabel(f"RC {rc1} - {rc2}")
+
+    plt.subplot(num_rows, num_cols, get_subplot_id(row, 1, num_cols))
+    plot_img(paths[row], cmap="gray")
+    plt.xlabel(f"adj {adjacencies[row]}")
+
+
+def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False):
+    rgb_img = np.repeat(np.expand_dims(skel_img.numpy(), axis=-1), 3, axis=2)
+    marker_size = 3
+
+    for i, (xy1, xy2) in enumerate(pairs_xy, start=1):
+        cv2.circle(rgb_img, tuple(xy1), marker_size, NodeDegrees(i).colour, -1)
+        cv2.circle(rgb_img, tuple(xy2), marker_size, NodeDegrees(i).colour, -1)
+
+    plot_bgr_img(rgb_img, title="1: white, 2: green, 3: red", show=show)
+
+
 def set_plot_title(data_names: list, row: int, rows: int):
+    num_cols = len(data_names)
     if row == 0:
         for col, t in enumerate(data_names):
-            plt.subplot(rows, 4, get_subplot_id(row, col))
+            plt.subplot(rows, num_cols, get_subplot_id(row, col, num_cols))
             plt.title(t)
 
 
-def get_subplot_id(row, col):
+def get_subplot_id(row, col, num_cols):
     """This function uses 0-indexing."""
-    return col + 1 + 4 * row
+    return col + 1 + num_cols * row
 
 
 def plot_adj_matr(img_skel: np.ndarray, pos: np.ndarray, adjacency: np.ndarray) -> None:

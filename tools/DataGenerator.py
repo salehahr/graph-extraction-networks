@@ -228,3 +228,114 @@ class GraphExtractionDG(DataGenerator):
 
         A_pos = tf.data.Dataset.zip((adj_matr, aug_sort_indices))
         return A_pos.map(transform_adj_matr, num_parallel_calls=tf.data.AUTOTUNE)
+
+
+class EdgeExtractionDG(tf.keras.utils.Sequence):
+    def __init__(
+        self,
+        config,
+        network,
+        test_type: TestType,
+        skel_img: tf.Tensor,
+        node_pos: tf.Tensor,
+        degrees: tf.Tensor,
+        adj_matr: tf.RaggedTensor,
+    ):
+        self.test_type = test_type
+
+        self.skel_img = tf.squeeze(skel_img)
+        self.node_pos = tf.squeeze(node_pos)
+        self.degrees = tf.squeeze(degrees)
+        self.adj_matr = adj_matr[0]
+
+        self.pos_list = sorted_pos_list_from_image(self.node_pos)
+
+        n = tf.shape(self.pos_list)[0]
+        self.num_nodes = n
+        self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
+
+        # dimensions
+        self.batch_size = config.node_pairs_in_batch
+        self.img_dims = config.img_dims
+        self.input_channels = network.input_channels
+        self.output_channels = network.output_channels
+
+        # shuffle before batching
+        all_combos = self._get_all_combinations()
+        all_combos = all_combos.shuffle(
+            self.max_combinations, reshuffle_each_iteration=False
+        )
+        self.all_combos = all_combos.batch(self.batch_size)
+
+        # shuffle
+        self.on_epoch_end()
+
+    def __len__(self):
+        """Denotes the number of batches per epoch
+        i.e. number of steps per epoch."""
+        return int(np.floor(self.max_combinations / self.batch_size))
+
+    def __getitem__(
+        self, i: int
+    ) -> Tuple[Tuple[tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor]]:
+        batch_combo = self.all_combos.skip(i).take(1).unbatch()
+        x = (self.skel_img, rebatch(batch_combo, self.batch_size))
+        y = self._get_labels(batch_combo)
+
+        return x, y
+
+    def _get_labels(self, batch_combo: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
+        def get_adjacency(pair: tf.Tensor) -> tf.Tensor:
+            n1, n2 = pair[0], pair[1]
+            return self.adj_matr[n1, n2]
+
+        def to_coords(pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+            xy1 = self.pos_list[pair[0], :]
+            xy2 = self.pos_list[pair[1], :]
+
+            rc1 = tf.reverse(xy1, axis=[0])
+            rc2 = tf.reverse(xy2, axis=[0])
+
+            return rc1, rc2
+
+        def to_path(adjacency: tf.Tensor, pair: tf.Tensor):
+            rc1, rc2 = to_coords(pair)
+            row_indices = tf.sort([rc1[0], rc2[0]])
+            col_indices = tf.sort([rc1[1], rc2[1]])
+
+            img_section = self.skel_img[
+                row_indices[0] : row_indices[1] + 1,
+                col_indices[0] : col_indices[1] + 1,
+            ]
+
+            return tf.math.multiply(
+                tf.cast(adjacency, tf.float32),
+                tf.RaggedTensor.from_tensor(img_section),
+            )
+
+        adj = batch_combo.map(get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
+        path = tf.data.Dataset.zip((adj, batch_combo)).map(
+            to_path, num_parallel_calls=tf.data.AUTOTUNE
+        )
+
+        adj, path = [rebatch(x, self.batch_size) for x in [adj, path]]
+
+        return adj, path
+
+    def _get_all_combinations(self) -> tf.data.Dataset:
+        n = self.num_nodes
+        indices = tf.range(n)
+
+        y, x = tf.meshgrid(indices, indices)
+        x = tf.expand_dims(x, 2)
+        y = tf.expand_dims(y, 2)
+        z = tf.concat([x, y], axis=2)
+
+        all_combos = tf.constant([[0, 0]])  # placeholder
+        for x in range(n - 1):
+            # goes from 0 to n - 2
+            aa = z[x + 1 :, x, :]
+            all_combos = tf.concat([all_combos, aa], axis=0)
+        all_combos = all_combos[1:, :]
+
+        return tf.data.Dataset.from_tensor_slices(all_combos)

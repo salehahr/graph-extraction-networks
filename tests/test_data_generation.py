@@ -2,9 +2,15 @@ import unittest
 
 import numpy as np
 
-from tools import Config, GraphExtractionDG, NodeExtractionDG, TestType
+from tools import (
+    Config,
+    EdgeExtractionDG,
+    GraphExtractionDG,
+    NodeExtractionDG,
+    TestType,
+)
 from tools.data import ds_to_list
-from tools.plots import plot_training_sample
+from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
 
 
 class TestNodeExtractionDG(unittest.TestCase):
@@ -127,6 +133,94 @@ class TestGraphExtractionDG(TestNodeExtractionDG):
         self.assertLessEqual(np.max(adj_matr), 1)
 
 
+class TestEdgeExtractionDG(TestNodeExtractionDG):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = Config("test_config.yaml")
+        cls.config.batch_size = 1
+        g_network = cls.config.network.graph_extraction
+        e_network = cls.config.network.edge_extraction
+        cls.network = e_network
+
+        graph_data = GraphExtractionDG(cls.config, g_network, TestType.TRAINING)
+        step_num = 0
+        x, y = graph_data[step_num]
+
+        cls.training_data = EdgeExtractionDG(
+            cls.config, e_network, TestType.TRAINING, *x, y
+        )
+
+    def test_validation_generator(self):
+        pass
+
+    def test_input_data(self):
+        step_num = 0
+        (skel_img, combos), _ = self.training_data[step_num]
+
+        skel_img = skel_img.numpy()
+        is_normalised = np.max(skel_img) <= 1
+        self.assertTrue(is_normalised)
+        self.assertEqual(skel_img.shape, (256, 256))
+        self.assertEqual(skel_img.dtype, np.float32)
+
+        combos = combos.numpy()
+        self.assertEqual(combos.shape, (self.training_data.batch_size, 2))
+        self.assertEqual(combos.dtype, np.int32)
+        self.assertGreaterEqual(np.min(combos), 0)
+        self.assertLessEqual(np.max(combos), self.training_data.num_nodes)
+
+    def test_output_data(self):
+        step_num = 0
+        _, (adjacency, path) = self.training_data[step_num]
+
+        adjacency = adjacency.numpy()
+        self.assertEqual(adjacency.shape, (self.training_data.batch_size,))
+
+        path = [p[0] for p in path.numpy()]
+        self.assertEqual(adjacency.shape[0], self.training_data.batch_size)
+
+        for a, p in zip(adjacency, path):
+            self.assertEqual(a.dtype, np.int32)
+            self.assertTrue(a in [0, 1])
+
+            is_normalised = np.max(p) <= 1
+            self.assertTrue(is_normalised)
+            self.assertEqual(np.max(p), a)
+
+    def test_all_combinations(self):
+        combos = self.training_data._get_all_combinations().as_numpy_iterator()
+        assert len(list(combos)) == self.training_data.max_combinations
+
+    def _choose_step_num(self):
+        has_adjacency = False
+        step_num = 0
+
+        while has_adjacency is False:
+            adjacencies = self.training_data[step_num][1][0]
+            has_adjacency = 1 in adjacencies
+
+            if has_adjacency:
+                break
+            else:
+                step_num += 1
+
+        return step_num
+
+    def test_plot_training_sample(self):
+        step_num = self._choose_step_num()
+
+        pos_list = self.training_data.pos_list.numpy()
+        combos = self.training_data[step_num][0][1].numpy()
+
+        pairs_xy = [pos_list[combo] for combo in combos]
+
+        plot_bgr_img(self.training_data.skel_img, show=True)
+        plot_node_pairs_on_skel(self.training_data.skel_img, pairs_xy, show=True)
+        plot_training_sample(
+            self.training_data, step_num=step_num, network=self.network.id
+        )
+
+
 class TestDataset(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -172,7 +266,7 @@ class TestDataset(unittest.TestCase):
 
     def test_train_and_val_ds(self):
         """
-        Ensures that none of the train/val filepaths are found outside of the
+        Ensures that none of the train/val filepaths are found outside the
         main dataset.
         """
         train_ds = self.config.training_ds
