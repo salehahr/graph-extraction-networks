@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-from .data import sorted_pos_list_from_image
 from .node_classifiers import NodeDegrees, NodePositions, NodeTypes
 
 marker_size = 3
@@ -82,7 +81,7 @@ def classifier_preview(output_matrices: dict, img_skel: np.ndarray) -> dict:
 
 
 def draw_circles(
-    base_img: np.ndarray, classifier_matrix: np.ndarray, colours: list
+    base_img: np.ndarray, classifier_matrix: np.ndarray, colours
 ) -> np.ndarray:
     """
     Draws circles on the image colour coded according to the unique values

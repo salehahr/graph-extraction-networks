@@ -77,7 +77,6 @@ def graph_to_node_attributes(graph: PolyGraph, dim: int) -> np.ndarray:
 def fp_to_adj_matr(fp: str) -> np.ndarray:
     adj_matr = PolyGraph.load(fp).adj_matrix.astype(np.uint8)
     adj_matr = np.expand_dims(adj_matr, -1)
-    # adj_vec = adj_matrix_to_vec(adj_matr)
     return adj_matr
 
 

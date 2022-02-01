@@ -1,4 +1,5 @@
 import unittest
+from typing import List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -21,7 +22,7 @@ class TestDataAugmentation(unittest.TestCase):
         cls.network_num, cls.training_data = cls._gen_training_data()
 
     @classmethod
-    def _init_old_data_augmenter(cls):
+    def _init_old_data_augmenter(cls) -> ImageDataGenerator:
         data_gen_args = dict(
             horizontal_flip=True,
             vertical_flip=True,
@@ -30,7 +31,7 @@ class TestDataAugmentation(unittest.TestCase):
         return ImageDataGenerator(**data_gen_args)
 
     @classmethod
-    def _gen_training_data(cls):
+    def _gen_training_data(cls) -> Tuple[int, NodeExtractionDG]:
         """Generates training data based on network ID."""
         network_num = 2
         training_data = NodeExtractionDG(
@@ -42,7 +43,7 @@ class TestDataAugmentation(unittest.TestCase):
 
         return network_num, training_data
 
-    def _get_samples(self):
+    def _get_samples(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Get first output of the first training batch."""
         x_batch, y_batch = self._get_first_batch()
 
@@ -55,7 +56,7 @@ class TestDataAugmentation(unittest.TestCase):
 
         return x_first, node_pos_first, degrees_first, node_types_first
 
-    def _get_first_batch(self):
+    def _get_first_batch(self) -> Tuple:
         """Gets first training batch."""
         plot_training_sample(self.training_data, network=self.network_num, rows=1)
 
@@ -78,7 +79,7 @@ class TestDataAugmentation(unittest.TestCase):
 
         plot_augmented(skel_img_aug, graph_aug)
 
-    def _aug_imgs(self, sample):
+    def _aug_imgs(self, sample: np.ndarray) -> List[np.ndarray]:
         img_iter = self.img_datagen.flow(sample, batch_size=1, seed=self.aug_seed)
         return [img_iter.next() for _ in range(4)]
 
@@ -274,7 +275,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
             ),
         )
 
-    def _apply_horz_flip(self, nodes: list) -> list:
+    def _apply_horz_flip(self, nodes: np.ndarray) -> list:
         """Only columns/x-coords are flipped."""
 
         def flip_x(xy):
@@ -283,7 +284,7 @@ class TestAdjacencyMatrix(unittest.TestCase):
 
         return list(map(flip_x, nodes))
 
-    def _apply_vert_flip(self, nodes: list) -> list:
+    def _apply_vert_flip(self, nodes: np.ndarray) -> list:
         """Only rows/y-coords are flipped."""
 
         def flip_y(xy):

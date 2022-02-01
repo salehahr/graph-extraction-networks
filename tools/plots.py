@@ -27,7 +27,7 @@ def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
         ax.set_yticks([])
 
 
-def plot_bgr_img(img, title=""):
+def plot_bgr_img(img, title="", show: bool = False):
     n_channels = img.shape[2] if len(img.shape) >= 3 else 1
     cmap = "gray" if n_channels == 1 else None
 
@@ -39,13 +39,17 @@ def plot_bgr_img(img, title=""):
     plt.yticks([])
     plt.title(title)
 
+    if show:
+        plt.show()
+
 
 def plot_training_sample(
     data_generator, network: int, step_num: int = 0, rows: int = 3
 ):
     """
     Plots the training data (inputs and labels) of a batch.
-    :param dataset: dataset containing training data
+    :param data_generator: training data generator
+    :param network: network id
     :param step_num: which epoch step
     :param rows: maximum number of data points to plot
     :return:
@@ -133,7 +137,7 @@ def get_subplot_id(row, col):
     return col + 1 + 4 * row
 
 
-def plot_adj_matr(img_skel: np.ndarray, pos: list, adjacency: np.ndarray) -> None:
+def plot_adj_matr(img_skel: np.ndarray, pos: np.ndarray, adjacency: np.ndarray) -> None:
     """
     Function for checking if the adjacency matrix matches the image
     by overlaying the graph over the skeletonised image.
@@ -157,7 +161,7 @@ def plot_adj_matr(img_skel: np.ndarray, pos: list, adjacency: np.ndarray) -> Non
     nx.draw(graph, pos=pos_dict, node_size=2, node_color="r", edge_color="g", width=1)
 
 
-def plot_augmented(x: List[np.ndarray], y: Dict[str, np.ndarray]):
+def plot_augmented(x: List[np.ndarray], y: Dict[str, List[np.ndarray]]):
     base_imgs = plot_augmented_inputs(x, "skeleton", cmap="gray")
     plot_augmented_outputs(y, base_imgs)
 

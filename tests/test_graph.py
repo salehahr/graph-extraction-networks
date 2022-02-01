@@ -57,7 +57,7 @@ class TestGraph(RandomImage):
         super(TestGraph, cls).setUpClass()
 
         cls.img_skel = cv2.imread(cls.img_skeletonised_fp, cv2.IMREAD_GRAYSCALE)
-        cls.plot_skeletonised()
+        plot_bgr_img(cls.img_skel, cls.title, show=True)
 
         graph_fp = cls.img_skeletonised_fp.replace("skeleton", "graphs").replace(
             ".png", ".json"
@@ -69,12 +69,6 @@ class TestGraph(RandomImage):
         node_pos = fp_to_node_attributes(graph_fp, img_length)[0, :, :, :].squeeze()
         positions = np.fliplr(np.argwhere(node_pos)).tolist()
         cls.positions = sort_list_of_nodes(positions)
-
-    @classmethod
-    def plot_skeletonised(cls):
-        plot_bgr_img(cls.img_skel)
-        plt.title(cls.title)
-        plt.show()
 
     def plot_adj_matr(self, adj_matr):
         plot_adj_matr(self.img_skel, self.positions, adj_matr)

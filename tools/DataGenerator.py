@@ -12,11 +12,9 @@ from tools.data import (
     fp_to_node_attributes,
     get_data_at_xy,
     sorted_pos_list_from_image,
-    unsorted_pos_list_from_image,
 )
+from tools.image import gen_pos_indices_img
 
-from .image import gen_pos_indices_img
-from .sort import get_sort_indices
 from .TestType import TestType
 
 
