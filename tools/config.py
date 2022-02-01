@@ -25,8 +25,9 @@ class NNConfig(BaseModel):
     # user input in .yaml file
     node_extraction: Union[dict, InputConfig]
     graph_extraction: Union[dict, InputConfig]
+    edge_extraction: Union[dict, InputConfig]
 
-    @validator("node_extraction", "graph_extraction")
+    @validator("node_extraction", "graph_extraction", "edge_extraction")
     def set_network(cls, v):
         return InputConfig(v)
 
@@ -44,6 +45,7 @@ class Config(BaseModel):
 
     validation_fraction: float
     batch_size: int
+    node_pairs_in_batch: int
     use_small_dataset: bool = False
     max_files: Optional[int] = None
 
