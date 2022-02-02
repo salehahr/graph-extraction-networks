@@ -105,3 +105,11 @@ def get_data_at_xy(matr: np.ndarray) -> np.ndarray:
     matr = matr.squeeze()
     rc = np.fliplr(pos_list_from_image(matr))
     return matr[rc[:, 0], rc[:, 1]] - 1
+
+
+def rebatch(x: tf.data.Dataset, batch_size: int) -> tf.Tensor:
+    return (
+        x.batch(batch_size, num_parallel_calls=tf.data.AUTOTUNE)
+        .take(1)
+        .get_single_element()
+    )

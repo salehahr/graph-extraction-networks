@@ -11,6 +11,7 @@ from tools.data import (
     fp_to_grayscale_img,
     fp_to_node_attributes,
     get_data_at_xy,
+    rebatch,
     sorted_pos_list_from_image,
 )
 from tools.image import gen_pos_indices_img
@@ -137,14 +138,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         return x
 
     def _rebatch(self, data: List[tf.data.Dataset]) -> List[tf.Tensor]:
-        def rebatch(x):
-            return (
-                x.batch(self.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
-                .take(1)
-                .get_single_element()
-            )
-
-        return [rebatch(d) for d in data]
+        return [rebatch(d, self.batch_size) for d in data]
 
 
 class NodeExtractionDG(DataGenerator):
