@@ -151,12 +151,6 @@ class TestUntrainedModel(unittest.TestCase):
         cls.network = cls.config.network.node_extraction
 
         cls.wandb = WandbConfig("test_wandb_config.yaml")
-        wandb.init(
-            project=cls.wandb.project,
-            entity=cls.wandb.entity,
-            name=cls.wandb.run_name,
-            config=cls.wandb.run_config,
-        )
 
         cls.weights = os.path.join(cwd, "weights.hdf5")
         checkpoint_path = os.path.join(log_dir, "checkpoint_{epoch}.hdf5")
@@ -164,7 +158,6 @@ class TestUntrainedModel(unittest.TestCase):
         cls.model = cls._init_model()
         cls.tensorboard = cls.model.tensorboard_callback(log_dir)
         cls.checkpoint = cls.model.checkpoint(checkpoint_path)
-        cls.wandb_cb = cls.model.wandb_callback()
 
     @classmethod
     def _init_model(cls) -> UNet:
@@ -193,6 +186,13 @@ class TestUntrainedModel(unittest.TestCase):
     def setUp(self) -> None:
         if os.path.isdir(log_dir):
             shutil.rmtree(log_dir)
+        wandb.init(
+            project=self.wandb.project,
+            entity=self.wandb.entity,
+            name=self.wandb.run_name,
+            config=self.wandb.run_config,
+        )
+        self.wandb_cb = self.model.wandb_callback()
 
     def test_train(self):
         """Smoke test to test that the model runs."""
@@ -213,8 +213,7 @@ class TestUntrainedModel(unittest.TestCase):
         validation_ds = NodeExtractionDG(self.config, self.network, TestType.VALIDATION)
         show_predictions(self.model, validation_ds)
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         wandb.finish()
 
 
