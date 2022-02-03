@@ -40,9 +40,12 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         else:
             raise Exception
 
+        # shuffle dataset before batching
+        ds = ds.shuffle(num_data, reshuffle_each_iteration=False)
+        self.ds = ds.batch(config.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
+
         # dimensions
         self.num_data = num_data
-        self.ds = ds.batch(config.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
         self.batch_size = config.batch_size
         self.img_dims = config.img_dims
         self.input_channels = network.input_channels
