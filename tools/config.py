@@ -4,12 +4,18 @@ import yaml
 from pydantic import BaseModel, validator
 
 from tools.data import get_skeletonised_ds
+from tools.NetworkType import NetworkType
 
 
 class InputConfig(BaseModel):
     # user input in .yaml file
+    id: Union[int, NetworkType]
     input_channels: int
     output_channels: int
+
+    @validator("id")
+    def set_id(cls, v) -> NetworkType:
+        return NetworkType(v)
 
     def __init__(self, data):
         super(InputConfig, self).__init__(**data)

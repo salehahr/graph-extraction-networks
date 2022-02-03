@@ -11,7 +11,7 @@ from tools.plots import plot_augmented, plot_training_sample
 from tools.sort import sort_nodes
 
 
-class TestDataAugmentation(unittest.TestCase):
+class TestNodesNNDataAugmentation(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
@@ -19,7 +19,22 @@ class TestDataAugmentation(unittest.TestCase):
         cls.img_datagen = cls._init_old_data_augmenter()
         cls.aug_seed = 1
 
-        cls.network_num, cls.training_data = cls._gen_training_data()
+        cls.network = cls._set_network()
+        cls.dg = cls._set_data_generator()
+        cls.training_data = cls.dg(
+            cls.config,
+            cls.network,
+            TestType.TRAINING,
+            augmented=False,
+        )
+
+    @classmethod
+    def _set_network(cls):
+        return cls.config.network.node_extraction
+
+    @classmethod
+    def _set_data_generator(cls):
+        return NodeExtractionDG
 
     @classmethod
     def _init_old_data_augmenter(cls) -> ImageDataGenerator:
@@ -29,19 +44,6 @@ class TestDataAugmentation(unittest.TestCase):
         )
 
         return ImageDataGenerator(**data_gen_args)
-
-    @classmethod
-    def _gen_training_data(cls) -> Tuple[int, NodeExtractionDG]:
-        """Generates training data based on network ID."""
-        network_num = 2
-        training_data = NodeExtractionDG(
-            cls.config,
-            cls.config.network.node_extraction,
-            TestType.TRAINING,
-            augmented=False,
-        )
-
-        return network_num, training_data
 
     def _get_samples(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Get first output of the first training batch."""
@@ -58,7 +60,7 @@ class TestDataAugmentation(unittest.TestCase):
 
     def _get_first_batch(self) -> Tuple:
         """Gets first training batch."""
-        plot_training_sample(self.training_data, network=self.network_num, rows=1)
+        plot_training_sample(self.training_data, network=self.network.id, rows=1)
 
         # gets the first batch (>= 1 images in batch)
         return self.training_data[0]
@@ -84,26 +86,21 @@ class TestDataAugmentation(unittest.TestCase):
         return [img_iter.next() for _ in range(4)]
 
     def test_data_aug(self):
-        plot_training_sample(self.training_data, network=self.network_num, rows=3)
+        plot_training_sample(self.training_data, network=self.network.id, rows=3)
 
         self.training_data.augmented = True
 
-        plot_training_sample(self.training_data, network=self.network_num, rows=3)
+        plot_training_sample(self.training_data, network=self.network.id, rows=3)
 
 
-class TestThirdNetworkDataAugmentation(TestDataAugmentation):
+class TestAdjMatrNNDataAugmentation(TestNodesNNDataAugmentation):
     @classmethod
-    def _gen_training_data(cls):
-        """Generates training data based on network ID."""
-        network_num = 3
-        training_data = GraphExtractionDG(
-            cls.config,
-            cls.config.network.graph_extraction,
-            TestType.TRAINING,
-            augmented=False,
-        )
+    def _set_network(cls):
+        return cls.config.network.graph_extraction
 
-        return network_num, training_data
+    @classmethod
+    def _set_data_generator(cls):
+        return GraphExtractionDG
 
     def _get_samples(self):
         """Get first output of the first training batch."""

@@ -14,6 +14,7 @@ from tools.image import (
     draw_circles,
     get_rgb,
 )
+from tools.NetworkType import NetworkType
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -44,7 +45,7 @@ def plot_bgr_img(img, title="", show: bool = False):
 
 
 def plot_training_sample(
-    data_generator, network: int, step_num: int = 0, rows: int = 3
+    data_generator, network: NetworkType, step_num: int = 0, rows: int = 3
 ):
     """
     Plots the training data (inputs and labels) of a batch.
@@ -58,7 +59,10 @@ def plot_training_sample(
 
     rows = data_generator.batch_size if rows > data_generator.batch_size else rows
 
-    plot_fcn = plot_sample if network == 2 else plot_sample_third_network
+    if network == NetworkType.NODES_NN:
+        plot_fcn = plot_sample_nodes_nn
+    elif network == NetworkType.ADJ_MATR_NN:
+        plot_fcn = plot_sample_adj_nn
 
     for row in range(rows):
         plt.figure(0)
@@ -67,7 +71,7 @@ def plot_training_sample(
     plt.show()
 
 
-def plot_sample(x: tf.Tensor, y: tuple, row: int = 0, rows: int = 0):
+def plot_sample_nodes_nn(x: tf.Tensor, y: tuple, row: int = 0, rows: int = 0):
     input_names = ["skel"]
     output_names = ["node_pos", "degrees", "node_types"]
     data_names = input_names + output_names
@@ -90,7 +94,7 @@ def plot_sample(x: tf.Tensor, y: tuple, row: int = 0, rows: int = 0):
         plot_img(output_images[attr])
 
 
-def plot_sample_third_network(x, y, row: int, rows: int):
+def plot_sample_adj_nn(x, y, row: int, rows: int):
     input_names = ["skel", "node_pos", "degrees"]
     output_names = ["adj_matr"]
     data_names = input_names + output_names

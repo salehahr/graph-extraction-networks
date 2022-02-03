@@ -11,10 +11,21 @@ class TestNodeExtractionDG(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        network = cls.config.network.node_extraction
+        cls.network = cls._set_network()
 
-        cls.training_data = NodeExtractionDG(cls.config, network, TestType.TRAINING)
-        cls.validation_data = NodeExtractionDG(cls.config, network, TestType.VALIDATION)
+        data_generator = cls._set_data_generator()
+        cls.training_data = data_generator(cls.config, cls.network, TestType.TRAINING)
+        cls.validation_data = data_generator(
+            cls.config, cls.network, TestType.VALIDATION
+        )
+
+    @classmethod
+    def _set_network(cls):
+        return cls.config.network.node_extraction
+
+    @classmethod
+    def _set_data_generator(cls):
+        return NodeExtractionDG
 
     def test_training_generator(self):
         self.assertEqual(len(self.training_data), 9)
@@ -30,7 +41,7 @@ class TestNodeExtractionDG(unittest.TestCase):
             self.assertIsNotNone(dataset[i])
 
     def test_plot_training_sample(self):
-        plot_training_sample(self.training_data, network=2)
+        plot_training_sample(self.training_data, network=self.network.id)
 
     def test_input_data(self):
         step_num = 0
@@ -72,17 +83,12 @@ class TestNodeExtractionDG(unittest.TestCase):
 
 class TestGraphExtractionDG(TestNodeExtractionDG):
     @classmethod
-    def setUpClass(cls) -> None:
-        cls.config = Config("test_config.yaml")
-        network = cls.config.network.graph_extraction
+    def _set_network(cls):
+        return cls.config.network.graph_extraction
 
-        cls.training_data = GraphExtractionDG(cls.config, network, TestType.TRAINING)
-        cls.validation_data = GraphExtractionDG(
-            cls.config, network, TestType.VALIDATION
-        )
-
-    def test_plot_training_sample(self):
-        plot_training_sample(self.training_data, network=3)
+    @classmethod
+    def _set_data_generator(cls):
+        return GraphExtractionDG
 
     def test_input_data(self):
         step_num = 0
