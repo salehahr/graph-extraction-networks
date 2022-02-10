@@ -2,17 +2,25 @@ import math
 import os
 import shutil
 import unittest
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 import wandb
 from wandb.keras import WandbCallback
 
+from model import VGG16
 from model.unet import NodesNN, NodesNNExtended, UNet
-from tools import Config, NodeExtractionDG, TestType, WandbConfig
+from tools import (
+    Config,
+    EdgeExtractionDG,
+    GraphExtractionDG,
+    NodeExtractionDG,
+    TestType,
+    WandbConfig,
+)
 from tools.image import classify
-from tools.plots import display_single_output, show_predictions
+from tools.plots import display_single_output, show_edge_predictions, show_predictions
 
 cwd = os.getcwd()
 assert "tests" in cwd
@@ -228,3 +236,87 @@ class TestTrainedModel(TestUntrainedModel):
         unet.build()
 
         return unet
+
+
+class TestEdgeNN(unittest.TestCase):
+    """Only for training adjacencies."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = Config("test_config.yaml")
+        cls.network = cls.config.network.edge_extraction
+        cls.weights = os.path.join(cwd, "weights_edge_nn.hdf5")
+
+        num_filters = 4
+        cls.model = cls._init_model(num_filters)
+
+        cls.training_data, cls.validation_data = cls._get_data()
+
+    @classmethod
+    def _init_model(cls, num_filters: int) -> VGG16:
+        edge_nn = VGG16(
+            input_size=(*cls.config.img_dims, cls.network.input_channels),
+            n_filters=num_filters,
+            pretrained_weights=cls.weights,
+        )
+        edge_nn.build()
+        return edge_nn
+
+    @classmethod
+    def _get_data(cls) -> Tuple[EdgeExtractionDG, EdgeExtractionDG]:
+        orig_batch_size = cls.config.batch_size
+
+        g_network = cls.config.network.graph_extraction
+        cls.config.batch_size = 1
+        graph_data = GraphExtractionDG(cls.config, g_network, TestType.TRAINING)
+        cls.config.batch_size = orig_batch_size
+
+        step_num = 0
+        x_train, y_train = graph_data[step_num]
+        x_val, y_val = graph_data[step_num + 1]
+
+        training_data = EdgeExtractionDG(
+            cls.config,
+            cls.network,
+            TestType.TRAINING,
+            *x_train,
+            y_train,
+            with_path=False,
+        )
+        validation_data = EdgeExtractionDG(
+            cls.config, cls.network, TestType.VALIDATION, *x_val, y_val, with_path=False
+        )
+
+        return training_data, validation_data
+
+    def test_train(self) -> None:
+        hist = self.model.fit(
+            x=self.training_data,
+            validation_data=self.validation_data,
+            epochs=2,
+            # steps per epoch
+            steps_per_epoch=5,
+            validation_steps=5,
+        )
+
+    def test_predict(self):
+        """Visual test."""
+        step_num = self._choose_step_num()
+        print(f"Prediction at step {step_num}...")
+        show_edge_predictions(self.model, self.validation_data, step_num)
+
+    def _choose_step_num(self) -> int:
+        """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
+        has_adjacency = False
+        step_num = 0
+
+        while has_adjacency is False:
+            _, adjacencies = self.validation_data[step_num]
+            has_adjacency = 1 in adjacencies
+
+            if has_adjacency:
+                break
+            else:
+                step_num += 1
+
+        return step_num
