@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from tools.adj_matr import transform_adj_matr
+from tools.colours import rgb_red
 from tools.data import (
     fp_to_adj_matr,
     fp_to_grayscale_img,
@@ -248,6 +249,10 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         self.degrees = tf.squeeze(degrees)
         self.adj_matr = adj_matr[0]
 
+        # derived data
+        self.skel_img_rgb = tf.stack(
+            [self.skel_img, self.skel_img, self.skel_img], axis=-1
+        )
         self.pos_list = sorted_pos_list_from_image(self.node_pos)
 
         n = tf.shape(self.pos_list)[0]
@@ -279,27 +284,32 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         self, i: int
     ) -> Tuple[Tuple[tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor]]:
         batch_combo = self.all_combos.skip(i).take(1).unbatch()
-        x = (self.skel_img, rebatch(batch_combo, self.batch_size))
+
+        x = self._get_combo_img(batch_combo)
         y = self._get_labels(batch_combo)
 
         return x, y
+
+    def _get_combo_img(self, batch_combo):
+        def to_combo_img(pair: tf.Tensor):
+            rc1, rc2 = self._to_coords(pair)
+            img = tf.Variable(self.skel_img_rgb)
+
+            img[rc1[0], rc1[1], :].assign(rgb_red)
+            img[rc2[0], rc2[1], :].assign(rgb_red)
+
+            return img
+
+        imgs = batch_combo.map(to_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
+        return rebatch(imgs, self.batch_size)
 
     def _get_labels(self, batch_combo: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
         def get_adjacency(pair: tf.Tensor) -> tf.Tensor:
             n1, n2 = pair[0], pair[1]
             return self.adj_matr[n1, n2]
 
-        def to_coords(pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-            xy1 = self.pos_list[pair[0], :]
-            xy2 = self.pos_list[pair[1], :]
-
-            rc1 = tf.reverse(xy1, axis=[0])
-            rc2 = tf.reverse(xy2, axis=[0])
-
-            return rc1, rc2
-
         def to_path(adjacency: tf.Tensor, pair: tf.Tensor):
-            rc1, rc2 = to_coords(pair)
+            rc1, rc2 = self._to_coords(pair)
             row_indices = tf.sort([rc1[0], rc2[0]])
             col_indices = tf.sort([rc1[1], rc2[1]])
 
@@ -321,6 +331,15 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         adj, path = [rebatch(x, self.batch_size) for x in [adj, path]]
 
         return adj, path
+
+    def _to_coords(self, pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        xy1 = self.pos_list[pair[0], :]
+        xy2 = self.pos_list[pair[1], :]
+
+        rc1 = tf.reverse(xy1, axis=[0])
+        rc2 = tf.reverse(xy2, axis=[0])
+
+        return rc1, rc2
 
     def _get_all_combinations(self) -> tf.data.Dataset:
         n = self.num_nodes
