@@ -89,7 +89,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 
         def skel_to_graph(skel_fp):
             graph_fp = tf.strings.regex_replace(skel_fp, "skeleton", "graphs")
-            graph_fp = tf.strings.regex_replace(graph_fp, "\.png", ".json")
+            graph_fp = tf.strings.regex_replace(graph_fp, r"\.png", ".json")
             return graph_fp
 
         graph_fps = skel_fps.map(skel_to_graph, num_parallel_calls=tf.data.AUTOTUNE)
