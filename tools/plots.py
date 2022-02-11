@@ -46,7 +46,7 @@ def plot_bgr_img(img, title="", show: bool = False):
 
 
 def plot_training_sample(
-    data_generator, network: NetworkType, step_num: int = 0, rows: int = 3
+    data_generator, network: NetworkType, step_num: int = 0, rows: int = 3, **kwargs
 ):
     """
     Plots the training data (inputs and labels) of a batch.
@@ -69,12 +69,14 @@ def plot_training_sample(
 
     for row in range(rows):
         plt.figure(0)
-        plot_fcn(data_generator, step_num, row, rows)
+        plot_fcn(data_generator, step_num, row, rows, **kwargs)
 
     plt.show()
 
 
-def plot_sample_nodes_nn(data_generator, step_num: int, row: int = 0, rows: int = 0):
+def plot_sample_nodes_nn(
+    data_generator, step_num: int, row: int = 0, rows: int = 0, **kwargs
+):
     input_names = ["skel"]
     output_names = ["node_pos", "degrees", "node_types"]
     data_names = input_names + output_names
@@ -100,7 +102,7 @@ def plot_sample_nodes_nn(data_generator, step_num: int, row: int = 0, rows: int 
         plot_img(output_images[attr])
 
 
-def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int):
+def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int, **kwargs):
     input_names = ["skel", "node_pos", "degrees"]
     output_names = ["adj_matr"]
     data_names = input_names + output_names
@@ -138,16 +140,18 @@ def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int):
     plot_adj_matr(skel_img, pos_list_xy, adj_matr)
 
 
-def plot_sample_edge_nn(data_generator, step_num: int, row: int, num_rows: int):
+def plot_sample_edge_nn(
+    data_generator, step_num: int, row: int, num_rows: int, **kwargs
+):
     num_cols = 2
     set_plot_title(["path", "path from DataGen"], row, num_rows)
 
-    (skel_img, combos), (adjacencies, paths) = data_generator[step_num]
+    combo_img, (adjacencies, paths) = data_generator[step_num]
     pos_list = data_generator.pos_list.numpy()
 
-    skel_img = np.float32(skel_img.numpy())
+    skel_img = np.float32(combo_img[row].numpy())
     adjacencies = adjacencies.numpy()
-    combos = combos.numpy()
+    combos = kwargs["combos"]
     paths = [p.numpy() for p in paths]
 
     # path

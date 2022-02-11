@@ -290,6 +290,9 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
         return x, y
 
+    def get_combo(self, i):
+        return self.all_combos.skip(i).take(1).get_single_element()
+
     def _get_combo_img(self, batch_combo):
         def to_combo_img(pair: tf.Tensor):
             rc1, rc2 = self._to_coords(pair)

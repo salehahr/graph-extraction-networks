@@ -155,19 +155,13 @@ class TestEdgeExtractionDG(TestNodeExtractionDG):
 
     def test_input_data(self):
         step_num = 0
-        (skel_img, combos), _ = self.training_data[step_num]
+        img, _ = self.training_data[step_num]
 
-        skel_img = skel_img.numpy()
-        is_normalised = np.max(skel_img) <= 1
+        img = img[0].numpy()
+        is_normalised = np.max(img) <= 1
         self.assertTrue(is_normalised)
-        self.assertEqual(skel_img.shape, (256, 256))
-        self.assertEqual(skel_img.dtype, np.float32)
-
-        combos = combos.numpy()
-        self.assertEqual(combos.shape, (self.training_data.batch_size, 2))
-        self.assertEqual(combos.dtype, np.int32)
-        self.assertGreaterEqual(np.min(combos), 0)
-        self.assertLessEqual(np.max(combos), self.training_data.num_nodes)
+        self.assertEqual(img.shape, (256, 256, 3))
+        self.assertEqual(img.dtype, np.float32)
 
     def test_output_data(self):
         step_num = 0
@@ -210,14 +204,17 @@ class TestEdgeExtractionDG(TestNodeExtractionDG):
         step_num = self._choose_step_num()
 
         pos_list = self.training_data.pos_list.numpy()
-        combos = self.training_data[step_num][0][1].numpy()
+        combos = self.training_data.get_combo(step_num).numpy()
 
         pairs_xy = [pos_list[combo] for combo in combos]
 
         plot_bgr_img(self.training_data.skel_img, show=True)
         plot_node_pairs_on_skel(self.training_data.skel_img, pairs_xy, show=True)
         plot_training_sample(
-            self.training_data, step_num=step_num, network=self.network.id
+            self.training_data,
+            step_num=step_num,
+            network=self.network.id,
+            combos=combos,
         )
 
 
