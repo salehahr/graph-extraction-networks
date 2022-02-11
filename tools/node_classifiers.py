@@ -18,20 +18,20 @@ class ColourEnum(Enum):
 
 class NodePositions(ColourEnum):
     IS_NOT_NODE = (0, None)
-    IS_NODE = (1, bgr_white)
+    IS_NODE = (1, BGR_WHITE)
 
 
 class NodeDegrees(ColourEnum):
     IS_NOT_NODE = (0, None)
-    DEG1 = (1, bgr_white)
-    DEG2 = (2, bgr_green)
-    DEG3 = (3, bgr_red)
-    DEG4 = (4, bgr_blue)
-    DEG5 = (5, bgr_lilac)
+    DEG1 = (1, BGR_WHITE)
+    DEG2 = (2, BGR_GREEN)
+    DEG3 = (3, BGR_RED)
+    DEG4 = (4, BGR_BLUE)
+    DEG5 = (5, BGR_LILAC)
 
 
 class NodeTypes(ColourEnum):
     IS_NOT_NODE = (0, None)
-    CROSSING = (1, bgr_blue)
-    END = (2, bgr_red)
-    BORDER = (3, bgr_yellow)
+    CROSSING = (1, BGR_BLUE)
+    END = (2, BGR_RED)
+    BORDER = (3, BGR_YELLOW)
