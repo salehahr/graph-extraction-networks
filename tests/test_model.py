@@ -26,6 +26,7 @@ cwd = os.getcwd()
 assert "tests" in cwd
 
 log_dir = os.path.join(cwd, "logs")
+log_dir_edge = os.path.join(cwd, "logs_edge")
 
 
 def _get_first_images(data_generator, attribute: Optional[str] = None):
@@ -245,12 +246,29 @@ class TestEdgeNN(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
         cls.network = cls.config.network.edge_extraction
+
+        cls.wandb = WandbConfig("test_wandb_config_edge.yaml")
+
         cls.weights = os.path.join(cwd, "weights_edge_nn.hdf5")
+        checkpoint_path = os.path.join(log_dir_edge, "checkpoint_{epoch}.hdf5")
 
         num_filters = 4
         cls.model = cls._init_model(num_filters)
+        cls.checkpoint = cls.model.checkpoint(checkpoint_path)
 
         cls.training_data, cls.validation_data = cls._get_data()
+
+    def setUp(self) -> None:
+        if os.path.isdir(log_dir_edge):
+            shutil.rmtree(log_dir_edge)
+        os.makedirs(log_dir_edge)
+        wandb.init(
+            project=self.wandb.project,
+            entity=self.wandb.entity,
+            name=self.wandb.run_name,
+            config=self.wandb.run_config,
+        )
+        # self.wandb_cb = self.model.wandb_callback()
 
     @classmethod
     def _init_model(cls, num_filters: int) -> VGG16:
@@ -293,17 +311,22 @@ class TestEdgeNN(unittest.TestCase):
         hist = self.model.fit(
             x=self.training_data,
             validation_data=self.validation_data,
-            epochs=2,
+            epochs=wandb.config.epochs,
             # steps per epoch
             steps_per_epoch=5,
             validation_steps=5,
+            callbacks=[self.checkpoint, WandbCallback()],
         )
+        self.model.save_weights(self.weights)
 
     def test_predict(self):
         """Visual test."""
         step_num = self._choose_step_num()
         print(f"Prediction at step {step_num}...")
         show_edge_predictions(self.model, self.validation_data, step_num)
+
+    def tearDown(self):
+        wandb.finish()
 
     def _choose_step_num(self) -> int:
         """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
