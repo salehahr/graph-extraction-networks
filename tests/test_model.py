@@ -26,7 +26,6 @@ cwd = os.getcwd()
 assert "tests" in cwd
 
 log_dir = os.path.join(cwd, "logs")
-log_dir_edge = os.path.join(cwd, "logs_edge")
 
 
 def _get_first_images(data_generator, attribute: Optional[str] = None):
@@ -250,7 +249,8 @@ class TestEdgeNN(unittest.TestCase):
         cls.wandb = WandbConfig("test_wandb_config_edge.yaml")
 
         cls.weights = os.path.join(cwd, "weights_edge_nn.hdf5")
-        checkpoint_path = os.path.join(log_dir_edge, "checkpoint_{epoch}.hdf5")
+        cls.checkpoints_dir = os.path.join(cwd, "logs_edge")
+        checkpoint_path = os.path.join(cls.checkpoints_dir, "checkpoint_{epoch}.hdf5")
 
         num_filters = 4
         cls.model = cls._init_model(num_filters)
@@ -259,9 +259,12 @@ class TestEdgeNN(unittest.TestCase):
         cls.training_data, cls.validation_data = cls._get_data()
 
     def setUp(self) -> None:
-        if os.path.isdir(log_dir_edge):
-            shutil.rmtree(log_dir_edge)
-        os.makedirs(log_dir_edge)
+        directories = [self.checkpoints_dir]
+        for d in directories:
+            if os.path.isdir(d):
+                shutil.rmtree(d)
+            os.makedirs(d)
+
         wandb.init(
             project=self.wandb.project,
             entity=self.wandb.entity,
@@ -317,7 +320,7 @@ class TestEdgeNN(unittest.TestCase):
             validation_steps=5,
             callbacks=[self.checkpoint, WandbCallback()],
         )
-        self.model.save_weights(self.weights)
+        # self.model.save_weights(self.weights)
 
     def test_predict(self):
         """Visual test."""
