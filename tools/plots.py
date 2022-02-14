@@ -331,3 +331,22 @@ def show_predictions(
         plt.savefig(filepath)
 
     plt.show()
+
+
+def show_edge_predictions(
+    model: tf.keras.models.Model,
+    data_generator,
+    step_num: int = 0,
+):
+    x, y_true = data_generator[step_num]
+    y_pred = model.predict(x)
+    y_pred, _ = classify(y_pred)
+
+    pos_list = data_generator.pos_list.numpy()
+    combos = data_generator.get_combo(step_num).numpy()
+    pairs_xy = [pos_list[c] for c in combos]
+    plot_node_pairs_on_skel(data_generator.skel_img, pairs_xy, show=True)
+
+    for id, (pred, true) in enumerate(zip(y_pred, y_true)):
+        text = f"{id+1:3d}: Pred {pred[0]:d} / True {true.numpy()[0]:d}"
+        print(text)

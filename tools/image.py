@@ -33,6 +33,7 @@ def classify(mask: np.ndarray) -> Tuple[np.ndarray, bool]:
     if is_binary:
         mask[mask > 0.5] = 1
         mask[mask <= 0.5] = 0
+        mask = mask.astype(np.uint8)
     else:
         mask = tf.argmax(mask, axis=-1)
         mask = mask[..., tf.newaxis].numpy()
