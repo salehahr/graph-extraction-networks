@@ -13,6 +13,12 @@ from tools.data import ds_to_list
 from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
 
 
+def cycle_through_items(dataset):
+    # one complete epoch: passes through all the data in the dataset
+    for i in range(len(dataset)):
+        assert dataset[i] is not None
+
+
 class TestNodeExtractionDG(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -35,16 +41,11 @@ class TestNodeExtractionDG(unittest.TestCase):
 
     def test_training_generator(self):
         self.assertEqual(len(self.training_data), 9)
-        self._cycle_through_items(self.training_data)
+        cycle_through_items(self.training_data)
 
     def test_validation_generator(self):
         self.assertEqual(len(self.validation_data), 1)
-        self._cycle_through_items(self.validation_data)
-
-    def _cycle_through_items(self, dataset):
-        # one complete epoch: passes through all the data in the dataset
-        for i in range(len(dataset)):
-            self.assertIsNotNone(dataset[i])
+        cycle_through_items(self.validation_data)
 
     def test_plot_training_sample(self):
         plot_training_sample(self.training_data, network=self.network.id)
@@ -133,7 +134,7 @@ class TestGraphExtractionDG(TestNodeExtractionDG):
         self.assertLessEqual(np.max(adj_matr), 1)
 
 
-class TestEdgeExtractionDG(TestNodeExtractionDG):
+class TestEdgeExtractionDG(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
@@ -147,11 +148,8 @@ class TestEdgeExtractionDG(TestNodeExtractionDG):
         x, y = graph_data[step_num]
 
         cls.training_data = EdgeExtractionDG(
-            cls.config, e_network, TestType.TRAINING, *x, y
+            cls.config, e_network, TestType.TRAINING, *x, y, with_path=True
         )
-
-    def test_validation_generator(self):
-        pass
 
     def test_input_data(self):
         step_num = 0
@@ -186,6 +184,7 @@ class TestEdgeExtractionDG(TestNodeExtractionDG):
         assert len(list(combos)) == self.training_data.max_combinations
 
     def _choose_step_num(self):
+        """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
         has_adjacency = False
         step_num = 0
 

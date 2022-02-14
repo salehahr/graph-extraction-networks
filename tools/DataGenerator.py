@@ -1,6 +1,6 @@
 import random
 from abc import ABC
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -241,8 +241,10 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         node_pos: tf.Tensor,
         degrees: tf.Tensor,
         adj_matr: tf.RaggedTensor,
+        with_path: bool,
     ):
         self.test_type = test_type
+        self.with_path = with_path
 
         self.skel_img = tf.squeeze(skel_img)
         self.node_pos = tf.squeeze(node_pos)
@@ -282,7 +284,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
     def __getitem__(
         self, i: int
-    ) -> Tuple[Tuple[tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor]]:
+    ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
         batch_combo = self.all_combos.skip(i).take(1).unbatch()
 
         x = self._get_combo_img(batch_combo)
@@ -293,7 +295,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
     def get_combo(self, i):
         return self.all_combos.skip(i).take(1).get_single_element()
 
-    def _get_combo_img(self, batch_combo):
+    def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
         def to_combo_img(pair: tf.Tensor):
             rc1, rc2 = self._to_coords(pair)
             img = tf.Variable(self.skel_img_rgb)
@@ -306,7 +308,9 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         imgs = batch_combo.map(to_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
         return rebatch(imgs, self.batch_size)
 
-    def _get_labels(self, batch_combo: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
+    def _get_labels(
+        self, batch_combo: tf.data.Dataset
+    ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
         def get_adjacency(pair: tf.Tensor) -> tf.Tensor:
             n1, n2 = pair[0], pair[1]
             return self.adj_matr[n1, n2]
@@ -327,13 +331,17 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
             )
 
         adj = batch_combo.map(get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
-        path = tf.data.Dataset.zip((adj, batch_combo)).map(
-            to_path, num_parallel_calls=tf.data.AUTOTUNE
-        )
+        path = None
 
-        adj, path = [rebatch(x, self.batch_size) for x in [adj, path]]
+        if self.with_path:
+            path = tf.data.Dataset.zip((adj, batch_combo)).map(
+                to_path, num_parallel_calls=tf.data.AUTOTUNE
+            )
+            path = rebatch(path, self.batch_size)
 
-        return adj, path
+        adj = tf.reshape(rebatch(adj, self.batch_size), [self.batch_size, 1])
+
+        return adj if not self.with_path else (adj, path)
 
     def _to_coords(self, pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         xy1 = self.pos_list[pair[0], :]
