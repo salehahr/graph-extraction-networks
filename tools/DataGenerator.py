@@ -269,13 +269,21 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
         # shuffle before batching
         all_combos = self._get_all_combinations()
-        all_combos = all_combos.shuffle(
+        self.all_combos_unbatched = all_combos.shuffle(
             self.max_combinations, reshuffle_each_iteration=False
         )
-        self.all_combos = all_combos.batch(self.batch_size)
 
         # shuffle
         self.on_epoch_end()
+
+    @property
+    def all_combos(self):
+        return self.all_combos_unbatched.batch(self.batch_size)
+
+    def on_epoch_end(self):
+        self.all_combos_unbatched = self.all_combos_unbatched.shuffle(
+            self.max_combinations, reshuffle_each_iteration=False
+        )
 
     def __len__(self):
         """Denotes the number of batches per epoch
