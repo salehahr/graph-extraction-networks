@@ -1,0 +1,22 @@
+project: edge_extraction
+entity: salehah
+
+
+# run details
+run_name: edge_nn_16f
+resume: true
+run_id: 2v9g2pcr
+run_type: training
+
+
+model_filename: model.h5
+
+
+parameters:
+  n_filters: 16
+  n_conv2_blocks: 2
+  n_conv3_blocks: 3
+  epochs: 10
+
+
+sweep_config: null
