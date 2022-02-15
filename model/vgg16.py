@@ -1,4 +1,5 @@
-from typing import Tuple
+import os
+from typing import Tuple, Union
 
 import tensorflow as tf
 from keras.callbacks import ModelCheckpoint
@@ -12,7 +13,7 @@ from model.utils import double_conv, input_tensor, pooling, single_conv
 class VGG16(Model):
     def __init__(
         self,
-        input_size: Tuple[int, int, int],
+        input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
         n_filters: int,
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
@@ -34,7 +35,7 @@ class VGG16(Model):
         super(VGG16, self).__init__(inputs=x, outputs=out, name="EdgeNN")
 
         # load pretrained weights
-        if pretrained_weights:
+        if pretrained_weights is not None and os.path.isfile(pretrained_weights):
             self.load_weights(pretrained_weights)
 
     def _conv2_blocks(self, x: tf.Tensor):
@@ -69,9 +70,14 @@ class VGG16(Model):
 
         return x
 
-    def build(self):
-        self.compile(optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"])
+    def build(self, **kwargs):
+        self.compile(
+            optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"], **kwargs
+        )
         self.summary()
+
+    def recompile(self):
+        self.compile(optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"])
 
     @staticmethod
     def checkpoint(filepath, save_frequency="epoch"):
