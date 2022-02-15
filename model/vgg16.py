@@ -5,7 +5,6 @@ from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.layers import GlobalMaxPooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from wandb.keras import WandbCallback
 
 from model.utils import double_conv, input_tensor, pooling, single_conv
 
@@ -15,29 +14,17 @@ class VGG16(Model):
         self,
         input_size: Tuple[int, int, int],
         n_filters: int,
+        n_conv2_blocks: int = 2,
+        n_conv3_blocks: int = 3,
         pretrained_weights=None,
     ):
+        self.n_filters = n_filters
+        self.n_conv2_blocks = n_conv2_blocks
+        self.n_conv3_blocks = n_conv3_blocks
+
         x = input_tensor(input_size)
-        out = None
-
-        # Blocks 1, 2
-        for i in range(1, 2 + 1):
-            conv_input = x if i == 1 else out
-
-            out = double_conv(conv_input, n_filters * 2 ** (i - 1), f"relu_block{i}")
-            out = pooling(out)
-
-        # Blocks 3, 4, 5
-        for i in range(3, 5 + 1):
-            out = double_conv(out, n_filters * 2 ** (i - 1), name=None)
-            out = single_conv(
-                out,
-                n_filters * 2 ** (i - 1),
-                kernel_size=3,
-                activation="relu",
-                name=f"relu_block{i}",
-            )
-            out = pooling(out)
+        out = self._conv2_blocks(x)
+        out = self._conv3_blocks(out)
 
         out = GlobalMaxPooling2D(data_format="channels_last", keepdims=True)(out)
         out = tf.keras.layers.Conv1D(1, 1, activation="sigmoid")(out)
@@ -50,12 +37,41 @@ class VGG16(Model):
         if pretrained_weights:
             self.load_weights(pretrained_weights)
 
+    def _conv2_blocks(self, x: tf.Tensor):
+        # Default: Blocks 1, 2
+        for i in range(1, self.n_conv2_blocks + 1):
+            x = double_conv(
+                x,
+                self.n_filters * 2 ** (i - 1),
+                f"relu_block{i}",
+                normalise=False,
+            )
+            x = pooling(x)
+
+        return x
+
+    def _conv3_blocks(self, x: tf.Tensor):
+        # Default: Blocks 3, 4, 5
+        final_block_num = self.n_conv2_blocks + self.n_conv3_blocks
+
+        for i in range(self.n_conv2_blocks + 1, final_block_num + 1):
+            x = double_conv(
+                x, self.n_filters * 2 ** (i - 1), name=None, normalise=False
+            )
+            x = single_conv(
+                x,
+                self.n_filters * 2 ** (i - 1),
+                kernel_size=3,
+                activation="relu",
+                name=f"relu_block{i}",
+            )
+            x = pooling(x)
+
+        return x
+
     def build(self):
         self.compile(optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"])
         self.summary()
-
-    def save_model(self, name):
-        self.save_weights(name)
 
     @staticmethod
     def checkpoint(filepath, save_frequency="epoch"):
@@ -67,7 +83,3 @@ class VGG16(Model):
             save_weights_only=True,
             save_freq=save_frequency,
         )
-
-    @staticmethod
-    def wandb_callback():
-        return WandbCallback()

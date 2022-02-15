@@ -1,3 +1,5 @@
+from typing import Optional, Tuple
+
 from keras.layers import (
     Activation,
     BatchNormalization,
@@ -22,13 +24,15 @@ File that defines layers for u-net model.
 
 
 # function that defines input layers for given shape
-def input_tensor(input_size):
+def input_tensor(input_size: Tuple[int, int, int]) -> Input:
     x = Input(input_size, name="input")
     return x
 
 
 # function that defines one convolutional layer with certain number of filters
-def single_conv(input_tensor, n_filters, kernel_size, name, activation):
+def single_conv(
+    input_tensor, n_filters: int, kernel_size: int, name: str, activation: str
+):
     return Conv2D(
         name=name,
         filters=n_filters,
@@ -38,14 +42,23 @@ def single_conv(input_tensor, n_filters, kernel_size, name, activation):
 
 
 # function that defines two sequential 2D convolutional layers with certain number of filters
-def double_conv(input_tensor, n_filters, name, kernel_size=3):
+def double_conv(
+    input_tensor,
+    n_filters: int,
+    name: Optional[str],
+    kernel_size: int = 3,
+    normalise: bool = True,
+):
     x = Conv2D(
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
         padding="same",
         kernel_initializer="he_normal",
     )(input_tensor)
-    x = BatchNormalization()(x)
+
+    if normalise:
+        x = BatchNormalization()(x)
+
     x = Activation("relu")(x)
     x = Conv2D(
         filters=n_filters,
@@ -53,7 +66,10 @@ def double_conv(input_tensor, n_filters, name, kernel_size=3):
         padding="same",
         kernel_initializer="he_normal",
     )(x)
-    x = BatchNormalization()(x)
+
+    if normalise:
+        x = BatchNormalization()(x)
+
     x = Activation("relu", name=name)(x)
     return x
 
@@ -84,7 +100,10 @@ def deconv(input_tensor, n_filters, kernel_size=3, stride=2):
 # function that defines Max Pooling layer with pool size 2 and applies Dropout
 def pooling(input_tensor, dropout_rate=0.1):
     x = MaxPooling2D(pool_size=(2, 2))(input_tensor)
-    x = Dropout(rate=dropout_rate)(x)
+
+    if dropout_rate > 0:
+        x = Dropout(rate=dropout_rate)(x)
+
     return x
 
 
