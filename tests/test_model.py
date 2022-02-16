@@ -15,10 +15,7 @@ from tools import Config, NodeExtractionDG, TestType, WandbConfig, get_eedg, get
 from tools.plots import display_single_output, show_edge_predictions, show_predictions
 from tools.postprocessing import classify
 
-cwd = os.getcwd()
-assert "tests" in cwd
-
-log_dir = os.path.join(cwd, "logs")
+assert "tests" in os.getcwd()
 
 
 def _get_first_images(data_generator, attribute: Optional[str] = None):
@@ -46,9 +43,9 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.wandb = WandbConfig("test_wandb_config.yaml", ds_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
-        cls.wandb = WandbConfig("test_wandb_config.yaml")
         cls.training_ds = NodeExtractionDG(cls.config, cls.network, TestType.TRAINING)
 
         cls.base_model = cls._init_model()
@@ -149,16 +146,13 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.wandb = WandbConfig("test_wandb_config.yaml", ds_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
-        cls.wandb = WandbConfig("test_wandb_config.yaml")
-
-        cls.weights = os.path.join(cwd, "weights.hdf5")
-        checkpoint_path = os.path.join(log_dir, "checkpoint_{epoch}.hdf5")
-
+        cls.weights = os.path.join(cls.config.base_path, "weights.hdf5")
         cls.model = cls._init_model()
-        cls.tensorboard = cls.model.tensorboard_callback(log_dir)
-        cls.checkpoint = cls.model.checkpoint(checkpoint_path)
+        cls.tensorboard = cls.model.tensorboard_callback(cls.config.log_path)
+        cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
     @classmethod
     def _init_model(cls) -> UNet:
@@ -185,8 +179,8 @@ class TestUntrainedModel(unittest.TestCase):
         return hist.epoch, hist.history
 
     def setUp(self) -> None:
-        if os.path.isdir(log_dir):
-            shutil.rmtree(log_dir)
+        if os.path.isdir(self.config.log_path):
+            shutil.rmtree(self.config.log_path)
         wandb.init(
             project=self.wandb.project,
             entity=self.wandb.entity,
@@ -198,7 +192,7 @@ class TestUntrainedModel(unittest.TestCase):
     def test_train(self):
         """Smoke test to test that the model runs."""
         self._train()
-        self.model.save_weights(self.weights)
+        self.model.save_weights(self.wandb.weights_path)
 
     def test_no_nan_losses(self):
         """Tests that the losses are not NaN."""
@@ -237,17 +231,13 @@ class TestEdgeNN(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.wandb = WandbConfig("test_wandb_config_edge.yaml", ds_config=cls.config)
         cls.network = cls.config.network.edge_extraction
 
-        cls.wandb = WandbConfig("test_wandb_config_edge.yaml")
-
-        cls.weights = os.path.join(cwd, "weights_edge_nn.hdf5")
-        cls.checkpoints_dir = os.path.join(cwd, "logs_edge")
-        checkpoint_path = os.path.join(cls.checkpoints_dir, "checkpoint_{epoch}.hdf5")
-
         num_filters = 4
+        cls.weights = os.path.join(cls.config.base_path, "weights_edge_nn.hdf5")
         cls.model = cls._init_model(num_filters)
-        cls.checkpoint = cls.model.checkpoint(checkpoint_path)
+        cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
         cls.graph_data = get_gedg(cls.config)
         edge_data = get_eedg(cls.config, cls.graph_data)
@@ -255,7 +245,7 @@ class TestEdgeNN(unittest.TestCase):
         cls.validation_data = edge_data[TestType.VALIDATION]
 
     def setUp(self) -> None:
-        directories = [self.checkpoints_dir]
+        directories = [self.config.checkpoint_dir]
         for d in directories:
             if os.path.isdir(d):
                 shutil.rmtree(d)

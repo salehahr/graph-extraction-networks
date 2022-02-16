@@ -20,9 +20,9 @@ predict_fp = os.path.join(base_path, f"img/predict_{label}.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
+    wandb_config = WandbConfig(wandb_fp, name, ds_config=conf)
     network = conf.network.node_extraction
 
-    wandb_config = WandbConfig(wandb_fp, name)
     wandb.init(
         project=wandb_config.project,
         entity=wandb_config.entity,

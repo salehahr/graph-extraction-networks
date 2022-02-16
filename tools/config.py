@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import os
 from typing import Any, Iterable, Optional, Tuple, Union
 
 import yaml
@@ -40,6 +43,7 @@ class Config(BaseModel):
     img_length: int
     network: Union[dict, NNConfig]
 
+    base_path: str
     data_path: str
     save_path: str
 
@@ -52,6 +56,10 @@ class Config(BaseModel):
     # generated from user input
     img_dims: Optional[Tuple[int, int]] = None
 
+    log_path: Optional[str] = None
+    checkpoint_dir: Optional[str] = None
+    checkpoint_path: Optional[str] = None
+
     dataset: Any = None
     test_ds: Any = None
 
@@ -63,7 +71,8 @@ class Config(BaseModel):
     train_ids: Optional[Iterable] = None
     validation_ids: Optional[Iterable] = None
 
-    steps_per_epoch: Optional[int]
+    run: Optional[WandbConfig] = None
+    steps_per_epoch: Optional[int] = None
 
     @validator("max_files")
     def check_max_files(cls, v, values):
@@ -83,6 +92,13 @@ class Config(BaseModel):
         super(Config, self).__init__(**data)
 
         self.img_dims = (self.img_length, self.img_length)
+
+        # paths
+        self.log_path = os.path.join(self.base_path, "logs")
+        self.checkpoint_dir = os.path.join(self.base_path, "checkpoints")
+        self.checkpoint_path = os.path.join(
+            self.checkpoint_dir, "checkpoint_{epoch}.hdf5"
+        )
 
         # training, validation, testing
         self.dataset = self.create_dataset()
@@ -124,11 +140,24 @@ class WandbConfig(BaseModel):
     run_config: dict
     sweep_config: Optional[dict]
 
-    def __init__(self, filepath: str, name=None):
+    # derived
+    ds_config: Optional[Config] = None
+    weights_path: Optional[str] = None
+
+    def __init__(
+        self, filepath: str, name: str = None, ds_config: Optional[Config] = None
+    ):
         with open(filepath) as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
 
         super(WandbConfig, self).__init__(**data)
 
-        if name is not None:
-            self.run_name = name
+        self.run_name = name if name is not None else self.run_name
+
+        if ds_config:
+            self.ds_config = ds_config
+            ds_config.run = self
+
+            self.weights_path = os.path.join(
+                ds_config.base_path, f"weights_{self.run_name}.hdf5"
+            )

@@ -14,6 +14,7 @@ network:
     input_channels: 3
     output_channels: 1
 
+base_path: /graphics/scratch/schuelej/sar/tfgraph/
 data_path: /graphics/scratch/schuelej/sar/data/256
 save_path: /graphics/scratch/schuelej/sar/data/256/results
 
