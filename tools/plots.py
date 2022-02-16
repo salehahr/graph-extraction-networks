@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
+from tools.colours import BGR_GREEN
 from tools.data import pos_list_from_image
 from tools.image import (
     classifier_preview,
@@ -146,6 +147,7 @@ def plot_sample_edge_nn(
     num_cols = 2
     set_plot_title(["path", "path from DataGen"], row, num_rows)
 
+    assert data_generator.with_path is True
     combo_img, (adjacencies, paths) = data_generator[step_num]
     pos_list = data_generator.pos_list.numpy()
 
@@ -169,15 +171,25 @@ def plot_sample_edge_nn(
     plt.xlabel(f"adj {adjacencies[row]}")
 
 
-def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False):
-    rgb_img = np.repeat(np.expand_dims(skel_img.numpy(), axis=-1), 3, axis=2)
+def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False) -> np.ndarray:
+    # image conversion
+    if skel_img.dtype is not tf.uint8:
+        skel_img = tf.image.convert_image_dtype(skel_img, tf.uint8).numpy()
+    else:
+        skel_img = skel_img.numpy()
+
+    rgb_img = np.repeat(np.expand_dims(skel_img, axis=-1), 3, axis=2)
     marker_size = 3
 
     for i, (xy1, xy2) in enumerate(pairs_xy, start=1):
-        cv2.circle(rgb_img, tuple(xy1), marker_size, NodeDegrees(i).colour, -1)
-        cv2.circle(rgb_img, tuple(xy2), marker_size, NodeDegrees(i).colour, -1)
+        colour = BGR_GREEN if len(pairs_xy) == 1 else NodeDegrees(i).colour
+        cv2.circle(rgb_img, tuple(xy1), marker_size, colour, -1)
+        cv2.circle(rgb_img, tuple(xy2), marker_size, colour, -1)
 
-    plot_bgr_img(rgb_img, title="1: white, 2: green, 3: red", show=show)
+    if show:
+        plot_bgr_img(rgb_img, title="1: white, 2: green, 3: red", show=show)
+
+    return rgb_img
 
 
 def set_plot_title(data_names: list, row: int, rows: int):
