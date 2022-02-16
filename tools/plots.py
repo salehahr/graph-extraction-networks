@@ -8,15 +8,10 @@ from matplotlib import pyplot as plt
 
 from tools.colours import BGR_GREEN
 from tools.data import pos_list_from_image
-from tools.image import (
-    classifier_preview,
-    classify,
-    colour_enums,
-    draw_circles,
-    get_rgb,
-)
+from tools.image import classifier_preview, colour_enums, draw_circles, get_rgb
 from tools.NetworkType import NetworkType
 from tools.node_classifiers import NodeDegrees
+from tools.postprocessing import classify, eedg_coordinates, eedg_predict
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -350,13 +345,8 @@ def show_edge_predictions(
     data_generator,
     step_num: int = 0,
 ):
-    x, y_true = data_generator[step_num]
-    y_pred = model.predict(x)
-    y_pred, _ = classify(y_pred)
-
-    pos_list = data_generator.pos_list.numpy()
-    combos = data_generator.get_combo(step_num).numpy()
-    pairs_xy = [pos_list[c] for c in combos]
+    y_true, y_pred = eedg_predict(data_generator, model, step_num)
+    pairs_xy = eedg_coordinates(data_generator, step_num)
     plot_node_pairs_on_skel(data_generator.skel_img, pairs_xy, show=True)
 
     for id, (pred, true) in enumerate(zip(y_pred, y_true)):

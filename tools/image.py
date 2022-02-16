@@ -1,10 +1,7 @@
-from typing import Tuple
-
 import cv2
 import numpy as np
-import tensorflow as tf
 
-from .node_classifiers import NodeDegrees, NodePositions, NodeTypes
+from tools.node_classifiers import NodeDegrees, NodePositions, NodeTypes
 
 marker_size = 3
 
@@ -24,21 +21,6 @@ def get_rgb(img):
         return img
     else:
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-
-def classify(mask: np.ndarray) -> Tuple[np.ndarray, bool]:
-    """Returns mask with integer classes."""
-    is_binary = mask.shape[-1] <= 2
-
-    if is_binary:
-        mask[mask > 0.5] = 1
-        mask[mask <= 0.5] = 0
-        mask = mask.astype(np.uint8)
-    else:
-        mask = tf.argmax(mask, axis=-1)
-        mask = mask[..., tf.newaxis].numpy()
-
-    return mask, is_binary
 
 
 def generate_outputs(graph, dim: int) -> dict:

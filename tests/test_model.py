@@ -12,8 +12,8 @@ from wandb.keras import WandbCallback
 from model import VGG16
 from model.unet import NodesNN, NodesNNExtended, UNet
 from tools import Config, NodeExtractionDG, TestType, WandbConfig, get_eedg, get_gedg
-from tools.image import classify
 from tools.plots import display_single_output, show_edge_predictions, show_predictions
+from tools.postprocessing import classify
 
 cwd = os.getcwd()
 assert "tests" in cwd
