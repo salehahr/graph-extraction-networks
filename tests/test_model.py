@@ -2,7 +2,7 @@ import math
 import os
 import shutil
 import unittest
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 import tensorflow as tf
@@ -11,14 +11,7 @@ from wandb.keras import WandbCallback
 
 from model import VGG16
 from model.unet import NodesNN, NodesNNExtended, UNet
-from tools import (
-    Config,
-    EdgeExtractionDG,
-    GraphExtractionDG,
-    NodeExtractionDG,
-    TestType,
-    WandbConfig,
-)
+from tools import Config, NodeExtractionDG, TestType, WandbConfig, get_eedg, get_gedg
 from tools.image import classify
 from tools.plots import display_single_output, show_edge_predictions, show_predictions
 
@@ -256,7 +249,10 @@ class TestEdgeNN(unittest.TestCase):
         cls.model = cls._init_model(num_filters)
         cls.checkpoint = cls.model.checkpoint(checkpoint_path)
 
-        cls.training_data, cls.validation_data = cls._get_data()
+        cls.graph_data = get_gedg(cls.config)
+        edge_data = get_eedg(cls.config, cls.graph_data)
+        cls.training_data = edge_data[TestType.TRAINING]
+        cls.validation_data = edge_data[TestType.VALIDATION]
 
     def setUp(self) -> None:
         directories = [self.checkpoints_dir]
@@ -282,33 +278,6 @@ class TestEdgeNN(unittest.TestCase):
         )
         edge_nn.build()
         return edge_nn
-
-    @classmethod
-    def _get_data(cls) -> Tuple[EdgeExtractionDG, EdgeExtractionDG]:
-        orig_batch_size = cls.config.batch_size
-
-        g_network = cls.config.network.graph_extraction
-        cls.config.batch_size = 1
-        graph_data = GraphExtractionDG(cls.config, g_network, TestType.TRAINING)
-        cls.config.batch_size = orig_batch_size
-
-        step_num = 0
-        x_train, y_train = graph_data[step_num]
-        x_val, y_val = graph_data[step_num + 1]
-
-        training_data = EdgeExtractionDG(
-            cls.config,
-            cls.network,
-            TestType.TRAINING,
-            *x_train,
-            y_train,
-            with_path=False,
-        )
-        validation_data = EdgeExtractionDG(
-            cls.config, cls.network, TestType.VALIDATION, *x_val, y_val, with_path=False
-        )
-
-        return training_data, validation_data
 
     def test_train(self) -> None:
         hist = self.model.fit(

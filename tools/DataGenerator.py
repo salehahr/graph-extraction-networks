@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import random
 from abc import ABC
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -16,12 +18,50 @@ from tools.data import (
     sorted_pos_list_from_image,
 )
 from tools.image import gen_pos_indices_img
-
-from .TestType import TestType
+from tools.TestType import TestType
 
 
 def to_skel_img(fp):
     return fp_to_grayscale_img(fp)
+
+
+def get_gedg(config) -> Dict[TestType, GraphExtractionDG]:
+    """Returns GraphExtractionDG with batch size 1."""
+    g_network = config.network.graph_extraction
+
+    orig_batch_size = config.batch_size
+    config.batch_size = 1
+
+    graph_data = {test: GraphExtractionDG(config, g_network, test) for test in TestType}
+
+    config.batch_size = orig_batch_size
+
+    return graph_data
+
+
+def get_eedg(
+    config, graph_data: Dict[TestType, GraphExtractionDG], step_num: int = 0
+) -> Dict[TestType, EdgeExtractionDG]:
+    """Returns training/validation data for Edge NN."""
+
+    edge_data = {}
+    for test in TestType:
+        if step_num < len(graph_data[test]):
+            x, y = graph_data[test][step_num]
+            data = EdgeExtractionDG(
+                config,
+                config.network.edge_extraction,
+                test,
+                *x,
+                y,
+                with_path=False,
+            )
+            edge_data[test] = data
+        else:
+            # e.g. if at a step_num during training that exceeds number of validation images
+            edge_data[test] = None
+
+    return edge_data
 
 
 class DataGenerator(tf.keras.utils.Sequence, ABC):
