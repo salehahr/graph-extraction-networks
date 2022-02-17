@@ -9,6 +9,7 @@ import tensorflow as tf
 import wandb
 from wandb.keras import WandbCallback
 
+import tools.run as run
 from model import VGG16
 from model.unet import NodesNN, NodesNNExtended, UNet
 from tools import Config, NodeExtractionDG, RunConfig, TestType, get_eedg, get_gedg
@@ -106,14 +107,9 @@ class TestSimpleModel(unittest.TestCase):
 
     @unittest.skip("Skip wandb test.")
     def test_wandb_train(self):
-        wandb.init(
-            project=self.wandb.project,
-            entity=self.wandb.entity,
-            name=self.wandb.run_name,
-            config=self.wandb.parameters,
-        )
+        run.start(self.wandb)
         self._wandb_train()
-        wandb.finish()
+        run.end()
 
     @unittest.skip("Skip parameter sweep.")
     def test_wandb_sweep(self):
@@ -123,7 +119,7 @@ class TestSimpleModel(unittest.TestCase):
             project=self.wandb.project,
         )
         wandb.agent(sweep_id, self._wandb_train, count=3)
-        wandb.finish()
+        run.end()
 
     def test_node_pos_model(self):
         is_binary = self._test_simple_model("node_pos", "binary_crossentropy")
@@ -181,12 +177,7 @@ class TestUntrainedModel(unittest.TestCase):
     def setUp(self) -> None:
         if os.path.isdir(self.config.log_path):
             shutil.rmtree(self.config.log_path)
-        wandb.init(
-            project=self.wandb.project,
-            entity=self.wandb.entity,
-            name=self.wandb.run_name,
-            config=self.wandb.run_config,
-        )
+        run.start(self.wandb)
         self.wandb_cb = self.model.wandb_callback()
 
     def test_train(self):
@@ -209,7 +200,7 @@ class TestUntrainedModel(unittest.TestCase):
         show_predictions(self.model, validation_ds)
 
     def tearDown(self):
-        wandb.finish()
+        run.end()
 
 
 class TestTrainedModel(TestUntrainedModel):
@@ -253,14 +244,6 @@ class TestEdgeNN(unittest.TestCase):
                 shutil.rmtree(d)
             os.makedirs(d)
 
-        wandb.init(
-            project=self.run_config.project,
-            entity=self.run_config.entity,
-            name=self.run_config.run_name,
-            config=self.run_config.run_config,
-        )
-        # self.wandb_cb = self.model.wandb_callback()
-
     @classmethod
     def _init_model(cls, num_filters: int) -> VGG16:
         edge_nn = VGG16(
@@ -272,38 +255,16 @@ class TestEdgeNN(unittest.TestCase):
         return edge_nn
 
     def test_train(self) -> None:
-        hist = self.model.fit(
-            x=self.training_data,
-            validation_data=self.validation_data,
-            epochs=wandb.config.epochs,
-            # steps per epoch
-            steps_per_epoch=5,
-            validation_steps=5,
-            callbacks=[self.checkpoint, WandbCallback()],
-        )
-        # self.model.save_weights(self.weights)
+        run.start(self.run_config)
+
+        data = get_eedg(self.config, self.graph_data)
+        run.train(self.model, data, debug=True)
+        run.predict(self.model, self.validation_data, max_pred=3, alternate=True)
+
+        run.end()
 
     def test_predict(self):
         """Visual test."""
-        step_num = self._choose_step_num()
+        step_num = run.choose_step_num(self.validation_data)
         print(f"Prediction at step {step_num}...")
         show_edge_predictions(self.model, self.validation_data, step_num)
-
-    def tearDown(self):
-        wandb.finish()
-
-    def _choose_step_num(self) -> int:
-        """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
-        has_adjacency = False
-        step_num = 0
-
-        while has_adjacency is False:
-            _, adjacencies = self.validation_data[step_num]
-            has_adjacency = 1 in adjacencies
-
-            if has_adjacency:
-                break
-            else:
-                step_num += 1
-
-        return step_num
