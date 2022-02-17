@@ -4,7 +4,7 @@ import os
 import wandb
 
 from model.unet import NodesNNExtended
-from tools import Config, NodeExtractionDG, TestType, WandbConfig
+from tools import Config, NodeExtractionDG, RunConfig, TestType
 from tools.plots import plot_training_sample, show_predictions
 
 base_path = "/graphics/scratch/schuelej/sar/tfgraph/"
@@ -20,7 +20,7 @@ predict_fp = os.path.join(base_path, f"img/predict_{label}.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
-    wandb_config = WandbConfig(wandb_fp, name, ds_config=conf)
+    wandb_config = RunConfig(wandb_fp, name, data_config=conf)
     network = conf.network.node_extraction
 
     wandb.init(

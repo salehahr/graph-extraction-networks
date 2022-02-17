@@ -8,6 +8,7 @@ from pydantic import BaseModel, validator
 
 from tools.data import get_skeletonised_ds
 from tools.NetworkType import NetworkType
+from tools.TestType import TestType
 
 
 class InputConfig(BaseModel):
@@ -71,7 +72,7 @@ class Config(BaseModel):
     train_ids: Optional[Iterable] = None
     validation_ids: Optional[Iterable] = None
 
-    run: Optional[WandbConfig] = None
+    run: Optional[RunConfig] = None
     steps_per_epoch: Optional[int] = None
 
     @validator("max_files")
@@ -132,32 +133,48 @@ class Config(BaseModel):
         return self.dataset.skip(self.num_train)
 
 
-class WandbConfig(BaseModel):
+class RunConfig(BaseModel):
     # user input in .yaml file
     project: str
     entity: str
+
     run_name: Optional[str]
-    run_config: dict
+    resume: bool
+    run_id: Optional[str]
+    run_type: Union[str, TestType]
+
+    model_filename: str
+
+    parameters: dict
     sweep_config: Optional[dict]
 
     # derived
-    ds_config: Optional[Config] = None
+    data_config: Optional[Config] = None
     weights_path: Optional[str] = None
 
+    @validator("run_type")
+    def set_run_type(cls, v: str) -> TestType:
+        if v == "train" or v == "training":
+            return TestType.TRAINING
+        elif v == "test" or v == "testing":
+            return TestType.TESTING
+        else:
+            raise Exception
+
     def __init__(
-        self, filepath: str, name: str = None, ds_config: Optional[Config] = None
+        self, filepath: str, name: str = None, data_config: Optional[Config] = None
     ):
         with open(filepath) as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
 
-        super(WandbConfig, self).__init__(**data)
+        super(RunConfig, self).__init__(**data)
 
         self.run_name = name if name is not None else self.run_name
 
-        if ds_config:
-            self.ds_config = ds_config
-            ds_config.run = self
+        if data_config:
+            self.data_config = data_config
+            data_config.run = self
 
             self.weights_path = os.path.join(
-                ds_config.base_path, f"weights_{self.run_name}.hdf5"
+                data_config.base_path, f"weights_{self.run_name}.hdf5"
             )

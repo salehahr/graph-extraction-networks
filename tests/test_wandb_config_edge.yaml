@@ -1,10 +1,21 @@
 project: my-test-project
 entity: salehah
-run_name: test_run_edge
 
-run_config:
+
+# run details
+run_name: test_run_edge
+resume: false
+run_id: null
+run_type: training
+
+
+model_filename: model.h5
+
+
+parameters:
   epochs: 2
   optimizer: adam
+
 
 sweep_config:
   name: optimiser

@@ -11,7 +11,7 @@ from wandb.keras import WandbCallback
 
 from model import VGG16
 from model.unet import NodesNN, NodesNNExtended, UNet
-from tools import Config, NodeExtractionDG, TestType, WandbConfig, get_eedg, get_gedg
+from tools import Config, NodeExtractionDG, RunConfig, TestType, get_eedg, get_gedg
 from tools.plots import display_single_output, show_edge_predictions, show_predictions
 from tools.postprocessing import classify
 
@@ -43,7 +43,7 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.wandb = WandbConfig("test_wandb_config.yaml", ds_config=cls.config)
+        cls.wandb = RunConfig("test_wandb_config.yaml", data_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
         cls.training_ds = NodeExtractionDG(cls.config, cls.network, TestType.TRAINING)
@@ -110,7 +110,7 @@ class TestSimpleModel(unittest.TestCase):
             project=self.wandb.project,
             entity=self.wandb.entity,
             name=self.wandb.run_name,
-            config=self.wandb.run_config,
+            config=self.wandb.parameters,
         )
         self._wandb_train()
         wandb.finish()
@@ -146,7 +146,7 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.wandb = WandbConfig("test_wandb_config.yaml", ds_config=cls.config)
+        cls.wandb = RunConfig("test_wandb_config.yaml", data_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
         cls.weights = os.path.join(cls.config.base_path, "weights.hdf5")
@@ -231,7 +231,9 @@ class TestEdgeNN(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.wandb = WandbConfig("test_wandb_config_edge.yaml", ds_config=cls.config)
+        cls.run_config = RunConfig(
+            "test_wandb_config_edge.yaml", data_config=cls.config
+        )
         cls.network = cls.config.network.edge_extraction
 
         num_filters = 4
@@ -252,10 +254,10 @@ class TestEdgeNN(unittest.TestCase):
             os.makedirs(d)
 
         wandb.init(
-            project=self.wandb.project,
-            entity=self.wandb.entity,
-            name=self.wandb.run_name,
-            config=self.wandb.run_config,
+            project=self.run_config.project,
+            entity=self.run_config.entity,
+            name=self.run_config.run_name,
+            config=self.run_config.run_config,
         )
         # self.wandb_cb = self.model.wandb_callback()
 

@@ -1,4 +1,4 @@
-from .config import Config, WandbConfig
+from .config import Config, RunConfig
 from .DataGenerator import (
     EdgeExtractionDG,
     GraphExtractionDG,
