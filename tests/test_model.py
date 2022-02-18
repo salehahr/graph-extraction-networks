@@ -6,7 +6,6 @@ from typing import Optional
 
 import numpy as np
 import tensorflow as tf
-import wandb
 from wandb.keras import WandbCallback
 
 import tools.run as run
@@ -43,7 +42,7 @@ class TestSimpleModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.wandb = RunConfig("test_wandb_config.yaml", data_config=cls.config)
+        cls.run_config = RunConfig("test_wandb_config.yaml", data_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
         cls.training_ds = NodeExtractionDG(cls.config, cls.network, TestType.TRAINING)
@@ -87,12 +86,13 @@ class TestSimpleModel(unittest.TestCase):
 
         return is_binary
 
-    def _wandb_train(self):
-        wandb_config = wandb.config
+    def _train_for_sweep(self):
+        run_ = run.start(self.run_config, is_sweep=True)
+
         model = self._get_simple_model(
             self.base_model.__dict__["node_pos"],
             "binary_crossentropy",
-            optimiser=wandb_config.optimizer,
+            optimiser=run_.config.optimizer,
         )
 
         skel_input, y_gt = _get_first_images(self.training_ds, "node_pos")
@@ -100,25 +100,13 @@ class TestSimpleModel(unittest.TestCase):
         model.fit(
             x=skel_input,
             y=y_gt,
-            callbacks=[WandbCallback(data_type="image")],
-            epochs=wandb_config.epochs,
+            callbacks=[WandbCallback()],
+            epochs=self.run_config.parameters["epochs"],
+            steps_per_epoch=3,
         )
 
-    @unittest.skip("Skip wandb test.")
-    def test_wandb_train(self):
-        run.start(self.wandb)
-        self._wandb_train()
-        run.end()
-
-    @unittest.skip("Skip parameter sweep.")
     def test_wandb_sweep(self):
-        sweep_id = wandb.sweep(
-            self.wandb.sweep_config,
-            entity=self.wandb.entity,
-            project=self.wandb.project,
-        )
-        wandb.agent(sweep_id, self._wandb_train, count=3)
-        run.end()
+        run.sweep(self.run_config, self._train_for_sweep, count=2)
 
     def test_node_pos_model(self):
         is_binary = self._test_simple_model("node_pos", "binary_crossentropy")
@@ -141,7 +129,7 @@ class TestUntrainedModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
-        cls.wandb = RunConfig("test_wandb_config.yaml", data_config=cls.config)
+        cls.run_config = RunConfig("test_wandb_config.yaml", data_config=cls.config)
         cls.network = cls.config.network.node_extraction
 
         cls.weights = os.path.join(cls.config.base_path, "weights.hdf5")
@@ -160,36 +148,29 @@ class TestUntrainedModel(unittest.TestCase):
         return unet
 
     def _train(self):
-        train_ds = NodeExtractionDG(self.config, self.network, TestType.TRAINING)
-        val_ds = NodeExtractionDG(self.config, self.network, TestType.VALIDATION)
+        data = {
+            test: NodeExtractionDG(self.config, self.network, test) for test in TestType
+        }
+        history = run.train(self.model, data, debug=True)
 
-        hist = self.model.fit(
-            x=train_ds,
-            steps_per_epoch=len(train_ds),
-            epochs=wandb.config.epochs,
-            validation_data=val_ds,
-            callbacks=[self.tensorboard, self.checkpoint, self.wandb_cb],
-        )
-
-        return hist.epoch, hist.history
+        return history
 
     def setUp(self) -> None:
         if os.path.isdir(self.config.log_path):
             shutil.rmtree(self.config.log_path)
-        run.start(self.wandb)
-        self.wandb_cb = self.model.wandb_callback()
+        run.start(self.run_config)
 
     def test_train(self):
         """Smoke test to test that the model runs."""
         self._train()
-        self.model.save_weights(self.wandb.weights_path)
+        run.save(self.run_config.weights_path, in_wandb_dir=False)
 
     def test_no_nan_losses(self):
         """Tests that the losses are not NaN."""
-        epochs, history = self._train()
+        history = self._train()
+        losses = history.history["loss"]
 
-        losses = history["loss"]
-        for e in epochs:
+        for e in history.epoch:
             self.assertFalse(math.isnan(losses[e]))
 
     def test_predict(self):
