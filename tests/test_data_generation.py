@@ -166,7 +166,7 @@ class TestEdgeExtractionDG(unittest.TestCase):
         _, (adjacency, path) = self.training_data[step_num]
 
         adjacency = adjacency.numpy()
-        self.assertEqual(adjacency.shape, (self.training_data.batch_size,))
+        self.assertEqual(adjacency.shape, (self.training_data.batch_size, 1))
 
         path = [p[0] for p in path.numpy()]
         self.assertEqual(adjacency.shape[0], self.training_data.batch_size)
