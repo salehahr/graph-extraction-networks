@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # run.check_weights(run_config)
 
     # generate data
-    graph_data = get_gedg(data_config)
+    graph_data = get_gedg(data_config, batch_size=1)
     num_images = len(graph_data[run_config.run_type])
 
     # loop over all images

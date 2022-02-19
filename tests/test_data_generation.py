@@ -2,7 +2,14 @@ import unittest
 
 import numpy as np
 
-from tools import Config, EdgeDGSingle, GraphExtractionDG, NodeExtractionDG, TestType
+from tools import (
+    Config,
+    EdgeDGSingle,
+    GraphExtractionDG,
+    NodeExtractionDG,
+    TestType,
+    get_gedg,
+)
 from tools.data import ds_to_list
 from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
 
@@ -133,16 +140,14 @@ class TestEdgeDGSingle(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
         cls.config.batch_size = 1
-        g_network = cls.config.network.graph_extraction
-        e_network = cls.config.network.edge_extraction
-        cls.network = e_network
+        cls.network = cls.config.network.edge_extraction
 
-        graph_data = GraphExtractionDG(cls.config, g_network, TestType.TRAINING)
+        graph_data = get_gedg(cls.config, batch_size=1)[TestType.TRAINING]
         step_num = 0
         x, y = graph_data[step_num]
 
         cls.training_data = EdgeDGSingle(
-            cls.config, e_network, TestType.TRAINING, *x, y, with_path=True
+            cls.config, cls.network, TestType.TRAINING, *x, y, with_path=True
         )
 
     def test_input_data(self):

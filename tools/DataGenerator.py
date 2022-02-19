@@ -28,16 +28,20 @@ def to_skel_img(fp):
     return fp_to_grayscale_img(fp)
 
 
-def get_gedg(config) -> Dict[TestType, GraphExtractionDG]:
-    """Returns GraphExtractionDG with batch size 1."""
+def get_gedg(
+    config, batch_size: Optional[int] = None
+) -> Dict[TestType, GraphExtractionDG]:
+    """Returns GraphExtractionDG with a default batch size of 1."""
     g_network = config.network.graph_extraction
-
     orig_batch_size = config.batch_size
-    config.batch_size = 1
+
+    if batch_size is not None:
+        config.batch_size = batch_size
 
     graph_data = {test: GraphExtractionDG(config, g_network, test) for test in TestType}
 
-    config.batch_size = orig_batch_size
+    if batch_size is not None:
+        config.batch_size = orig_batch_size
 
     return graph_data
 
@@ -277,6 +281,10 @@ class GraphExtractionDG(DataGenerator):
 
         A_pos = tf.data.Dataset.zip((adj_matr, aug_sort_indices))
         return A_pos.map(transform_adj_matr, num_parallel_calls=tf.data.AUTOTUNE)
+
+    @property
+    def all_data(self):
+        return self._get_data()
 
 
 class EdgeDGSingle(tf.keras.utils.Sequence):

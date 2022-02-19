@@ -23,7 +23,7 @@ class TestEdgeNN(unittest.TestCase):
         cls.model = cls._init_model(num_filters)
         cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
-        cls.graph_data = get_gedg(cls.config)
+        cls.graph_data = get_gedg(cls.config, batch_size=1)
         edge_data = get_eedg(cls.config, cls.graph_data)
         cls.training_data = edge_data[TestType.TRAINING]
         cls.validation_data = edge_data[TestType.VALIDATION]
