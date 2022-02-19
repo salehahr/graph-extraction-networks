@@ -147,7 +147,7 @@ def plot_sample_edge_nn(
     pos_list = data_generator.pos_list.numpy()
 
     skel_img = np.float32(combo_img[row].numpy())
-    adjacencies = adjacencies.numpy()
+    adjacencies = adjacencies.numpy().squeeze()
     combos = kwargs["combos"]
     paths = [p.numpy() for p in paths]
 
