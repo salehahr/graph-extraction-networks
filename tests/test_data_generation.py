@@ -4,6 +4,7 @@ import numpy as np
 
 from tools import (
     Config,
+    EdgeDGMultiple,
     EdgeDGSingle,
     GraphExtractionDG,
     NodeExtractionDG,
@@ -228,7 +229,7 @@ class TestEdgeDGSingle(unittest.TestCase):
         step_num = self._choose_step_num()
 
         pos_list = self.training_data.pos_list.numpy()
-        combos = self.training_data.get_combo(0).numpy()
+        combos = self.training_data.get_combo(step_num).numpy()
 
         pairs_xy = [pos_list[combo] for combo in combos]
 
@@ -239,6 +240,37 @@ class TestEdgeDGSingle(unittest.TestCase):
             step_num=step_num,
             network=self.network.id,
             combos=combos,
+        )
+
+
+class TestEdgeDGMultiple(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.config = Config("test_config.yaml")
+        cls.run_config = RunConfig(
+            "test_wandb_config_edge.yaml", data_config=cls.config
+        )
+        cls.network = cls.config.network.edge_extraction
+
+        test_type = TestType.TRAINING
+        gedg = get_gedg(cls.config)
+        cls.training_data = EdgeDGMultiple(
+            cls.config,
+            cls.run_config,
+            gedg[test_type],
+            with_path=True,
+        )
+
+    def test_get_data(self):
+        self.assertIsNotNone(self.training_data[0])
+
+    def test_plot_training_sample(self):
+        step_num = 0
+        plot_training_sample(
+            self.training_data,
+            step_num=step_num,
+            network=self.network.id,
+            multiple=True,
         )
 
 

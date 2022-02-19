@@ -18,7 +18,7 @@ base_path: /graphics/scratch/schuelej/sar/tfgraph/tests
 data_path: /graphics/scratch/schuelej/sar/data/256
 save_path: /graphics/scratch/schuelej/sar/data/256/results
 
-validation_fraction: 0.1
+validation_fraction: 0.2
 batch_size: 3
 
 use_small_dataset: true
