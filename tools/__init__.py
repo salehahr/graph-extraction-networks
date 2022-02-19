@@ -1,5 +1,6 @@
 from .config import Config, RunConfig
 from .DataGenerator import (
+    EdgeDGMultiple,
     EdgeDGSingle,
     GraphExtractionDG,
     NodeExtractionDG,

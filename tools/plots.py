@@ -63,9 +63,16 @@ def plot_training_sample(
     else:
         raise Exception
 
-    for row in range(rows):
-        plt.figure(0)
-        plot_fcn(data_generator, step_num, row, rows, **kwargs)
+    multiple_imgs = False
+    if "multiple" in kwargs.keys() and kwargs["multiple"] is True:
+        multiple_imgs = True
+
+    if not multiple_imgs:
+        for row in range(rows):
+            plt.figure(0)
+            plot_fcn(data_generator, step_num, row, rows, **kwargs)
+    else:
+        plot_fcn(data_generator, step_num, 0, rows, **kwargs)
 
     plt.show()
 
@@ -139,31 +146,72 @@ def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int, **kwa
 def plot_sample_edge_nn(
     data_generator, step_num: int, row: int, num_rows: int, **kwargs
 ):
+    multiple_imgs = False
+    if "multiple" in kwargs.keys() and kwargs["multiple"] is True:
+        multiple_imgs = True
+
     num_cols = 2
-    set_plot_title(["path", "path from DataGen"], row, num_rows)
 
     assert data_generator.with_path is True
     combo_img, (adjacencies, paths) = data_generator[step_num]
-    pos_list = data_generator.pos_list.numpy()
-
-    skel_img = np.float32(combo_img[row].numpy())
     adjacencies = adjacencies.numpy().squeeze()
-    combos = kwargs["combos"]
     paths = [p.numpy() for p in paths]
 
-    # path
-    rc1, rc2 = np.fliplr(pos_list[combos[row]])
-    rows = np.sort([rc1[0], rc2[0]])
-    cols = np.sort([rc1[1], rc2[1]])
+    if not multiple_imgs:
+        set_plot_title(["path", "path from DataGen"], row, num_rows)
+        pos_list = data_generator.pos_list.numpy()
+        combos = kwargs["combos"]
 
-    img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1, 0]
-    plt.subplot(num_rows, num_cols, get_subplot_id(row, 0, num_cols))
-    plot_img(img_section, cmap="gray")
-    plt.xlabel(f"RC {rc1} - {rc2}")
+        skel_img = np.float32(combo_img[row].numpy())
 
-    plt.subplot(num_rows, num_cols, get_subplot_id(row, 1, num_cols))
-    plot_img(paths[row], cmap="gray")
-    plt.xlabel(f"adj {adjacencies[row]}")
+        # path
+        rc1, rc2 = np.fliplr(pos_list[combos[row]])
+        rows = np.sort([rc1[0], rc2[0]])
+        cols = np.sort([rc1[1], rc2[1]])
+
+        img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1, 0]
+        plt.subplot(num_rows, num_cols, get_subplot_id(row, 0, num_cols))
+        plot_img(img_section, cmap="gray")
+        plt.xlabel(f"RC {rc1} - {rc2}")
+
+        plt.subplot(num_rows, num_cols, get_subplot_id(row, 1, num_cols))
+        plot_img(paths[row], cmap="gray")
+        plt.xlabel(f"adj {adjacencies[row]}")
+    else:
+        pos_lists = data_generator.get_pos_list(step_num)
+        combos = data_generator.get_combo(step_num).numpy()
+        num_imgs = data_generator.batch_size
+        num_combos = data_generator.node_pairs_image
+
+        for i in range(num_imgs):
+            idx = i * num_imgs
+
+            skel_img = np.float32(combo_img[idx].numpy())[:, :, 0]
+
+            pos_list = pos_lists[i].numpy()
+            im_combos = combos[idx : idx + num_combos]
+            im_paths = paths[idx : idx + num_combos]
+            pairs_xy = [pos_list[combo] for combo in im_combos]
+
+            plot_node_pairs_on_skel(skel_img, pairs_xy, show=True)
+            set_plot_title(["path", "path from DataGen"], row, num_rows)
+
+            for ii in range(num_combos):
+                # path
+                rc1, rc2 = np.fliplr(pairs_xy[ii])
+                rows = np.sort([rc1[0], rc2[0]])
+                cols = np.sort([rc1[1], rc2[1]])
+
+                img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1]
+                plt.subplot(num_rows, num_cols, get_subplot_id(ii, 0, num_cols))
+                plot_img(img_section, cmap="gray")
+                plt.xlabel(f"RC {rc1} - {rc2}")
+
+                plt.subplot(num_rows, num_cols, get_subplot_id(ii, 1, num_cols))
+                plot_img(im_paths[ii], cmap="gray")
+                plt.xlabel(f"adj {adjacencies[row]}")
+
+            plt.show()
 
 
 def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False) -> np.ndarray:

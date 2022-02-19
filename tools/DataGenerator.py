@@ -46,31 +46,14 @@ def get_gedg(
 
 
 def get_eedg(
-    config,
-    num_node_pairs: int,
-    graph_data: Dict[TestType, GraphExtractionDG],
-    step_num: int = 0,
+    config: Config, run_config: RunConfig, graph_data: Dict[TestType, GraphExtractionDG]
 ) -> Dict[TestType, EdgeDGSingle]:
     """Returns training/validation data for Edge NN."""
 
-    edge_data = {}
-    for test in TestType:
-        if step_num < len(graph_data[test]):
-            x, y = graph_data[test][step_num]
-            data = EdgeDGSingle(
-                config,
-                num_node_pairs,
-                test,
-                *x,
-                y,
-                with_path=False,
-            )
-            edge_data[test] = data
-        else:
-            # e.g. if at a step_num during training that exceeds number of validation images
-            edge_data[test] = None
-
-    return edge_data
+    return {
+        test: EdgeDGMultiple(config, run_config, graph_data[test], with_path=False)
+        for test in TestType
+    }
 
 
 class DataGenerator(tf.keras.utils.Sequence, ABC):
@@ -287,6 +270,128 @@ class GraphExtractionDG(DataGenerator):
     @property
     def all_data(self):
         return self._get_data()
+
+
+class EdgeDGMultiple(tf.keras.utils.Sequence):
+    """
+    Generates node combinations and corresponding labels (path and adjacency)
+    across multiple skeletonised images.
+    """
+
+    def __init__(
+        self,
+        config: Config,
+        run_config: RunConfig,
+        gedg: GraphExtractionDG,
+        with_path: bool,
+    ):
+        self.config = config
+
+        self.test_type = gedg.test_type
+        self.with_path = with_path
+
+        self.gedg = gedg
+
+        # dimensions
+        network = config.network.edge_extraction
+        self.input_channels = network.input_channels
+        self.output_channels = network.output_channels
+        self._batch_size = run_config.images_in_batch
+        self.node_pairs_image = run_config.node_pairs_in_image
+        self.node_pairs_batch = self.batch_size * self.node_pairs_image
+        self.img_dims = config.img_dims
+
+        # derived data
+        self.combos: List[Optional[tf.Tensor]] = [None] * len(self.gedg)
+        self.pos_list: List[Optional[List[tf.Tensor]]] = [None] * len(self.gedg)
+
+        # shuffle
+        self.on_epoch_end()
+
+        # checks
+        assert self.gedg.batch_size == self._batch_size
+
+    @property
+    def batch_size(self):
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, value):
+        self._batch_size = value
+        self.gedg.batch_size = value
+
+    def on_epoch_end(self):
+        self.gedg.on_epoch_end()
+
+    def __len__(self):
+        return len(self.gedg)
+
+    def __getitem__(
+        self, i: int
+    ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
+        (skel_imgs, node_positions, degrees), adj_matrs = self.gedg[i]
+
+        # placeholders
+        pos_list = [None] * self.batch_size
+        combos = [None] * self.batch_size
+        combo_imgs = [None] * self.batch_size
+        adjacencies = [None] * self.batch_size
+        paths = [None] * self.batch_size
+
+        # iterate over the images (num images = self.batch_size)
+        for ii, data in enumerate(zip(skel_imgs, node_positions, degrees, adj_matrs)):
+            skel_img, node_pos, degree, adj_matr = data
+
+            # eedg_single returns node combinations (num combos = self.node_pairs_image)
+            eedg_single = EdgeDGSingle(
+                self.config,
+                self.node_pairs_image,
+                self.test_type,
+                skel_img,
+                node_pos,
+                degree,
+                adj_matr,
+                with_path=self.with_path,
+                seed=i + ii,
+            )
+
+            x, y = eedg_single[0]
+
+            pos_list[ii] = eedg_single.pos_list
+            combos[ii] = eedg_single.get_combo(0)
+            combo_imgs[ii] = x
+
+            if self.with_path:
+                adjacencies[ii], paths[ii] = y
+            else:
+                adjacencies[ii] = y
+
+        self.pos_list[i] = pos_list
+        self.combos[i] = tf.concat(combos, axis=0)
+        combo_imgs = tf.concat(combo_imgs, axis=0)
+        adjacencies = tf.concat(adjacencies, axis=0)
+
+        if self.with_path:
+            paths = tf.concat(paths, axis=0)
+            return combo_imgs, (adjacencies, paths)
+        else:
+            return combo_imgs, adjacencies
+
+    def get_combo(self, i: int):
+        return self._get_derived_data(i, "combos")
+
+    def get_pos_list(self, i: int):
+        return self._get_derived_data(i, "pos_list")
+
+    def _get_derived_data(self, i: int, key: str):
+        assert key in self.__dict__.keys()
+        val = self.__dict__[key][i]
+
+        if val is None:
+            self.__getitem__(i)
+            return self.__dict__[key][i]
+        else:
+            return val
 
 
 class EdgeDGSingle(tf.keras.utils.Sequence):
