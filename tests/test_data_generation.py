@@ -2,13 +2,7 @@ import unittest
 
 import numpy as np
 
-from tools import (
-    Config,
-    EdgeExtractionDG,
-    GraphExtractionDG,
-    NodeExtractionDG,
-    TestType,
-)
+from tools import Config, EdgeDGSingle, GraphExtractionDG, NodeExtractionDG, TestType
 from tools.data import ds_to_list
 from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
 
@@ -134,7 +128,7 @@ class TestGraphExtractionDG(TestNodeExtractionDG):
         self.assertLessEqual(np.max(adj_matr), 1)
 
 
-class TestEdgeExtractionDG(unittest.TestCase):
+class TestEdgeDGSingle(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
@@ -147,7 +141,7 @@ class TestEdgeExtractionDG(unittest.TestCase):
         step_num = 0
         x, y = graph_data[step_num]
 
-        cls.training_data = EdgeExtractionDG(
+        cls.training_data = EdgeDGSingle(
             cls.config, e_network, TestType.TRAINING, *x, y, with_path=True
         )
 

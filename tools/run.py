@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import tensorflow as tf
 
     from model import UNet
-    from tools import EdgeExtractionDG
+    from tools import EdgeDGSingle
 
 
 def get_configs(config_fp: str, run_name: str) -> Tuple[Config, RunConfig]:
@@ -142,7 +142,7 @@ def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
 
 def predict(
     model_: VGG16,
-    val_data: EdgeExtractionDG,
+    val_data: EdgeDGSingle,
     max_pred: int = 3,
     alternate: bool = False,
     only_adj_nodes: bool = True,
@@ -182,7 +182,7 @@ def predict(
 
 
 def choose_step_num(
-    val_data: EdgeExtractionDG, step_num: int = 0, pick_adj: bool = True
+    val_data: EdgeDGSingle, step_num: int = 0, pick_adj: bool = True
 ) -> int:
     """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
     found = False

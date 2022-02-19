@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC
-from typing import Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -19,6 +19,9 @@ from tools.data import (
 )
 from tools.image import gen_pos_indices_img
 from tools.TestType import TestType
+
+if TYPE_CHECKING:
+    from tools.config import Config, InputConfig
 
 
 def to_skel_img(fp):
@@ -41,14 +44,14 @@ def get_gedg(config) -> Dict[TestType, GraphExtractionDG]:
 
 def get_eedg(
     config, graph_data: Dict[TestType, GraphExtractionDG], step_num: int = 0
-) -> Dict[TestType, EdgeExtractionDG]:
+) -> Dict[TestType, EdgeDGSingle]:
     """Returns training/validation data for Edge NN."""
 
     edge_data = {}
     for test in TestType:
         if step_num < len(graph_data[test]):
             x, y = graph_data[test][step_num]
-            data = EdgeExtractionDG(
+            data = EdgeDGSingle(
                 config,
                 config.network.edge_extraction,
                 test,
@@ -271,11 +274,16 @@ class GraphExtractionDG(DataGenerator):
         return A_pos.map(transform_adj_matr, num_parallel_calls=tf.data.AUTOTUNE)
 
 
-class EdgeExtractionDG(tf.keras.utils.Sequence):
+class EdgeDGSingle(tf.keras.utils.Sequence):
+    """
+    Generates node combinations and corresponding labels (path and adjacency)
+    from a single skeletonised image.
+    """
+
     def __init__(
         self,
-        config,
-        network,
+        config: Config,
+        network: InputConfig,
         test_type: TestType,
         skel_img: tf.Tensor,
         node_pos: tf.Tensor,
@@ -316,7 +324,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         self.on_epoch_end()
 
     @property
-    def combos(self):
+    def combos(self) -> tf.data.Dataset:
         return self.unbatched_combos.batch(self.batch_size)
 
     def on_epoch_end(self):
@@ -324,7 +332,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
             self.unbatched_combos, shuffle=True
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Denotes the number of batches per epoch
         i.e. number of steps per epoch."""
         return int(np.floor(self.num_combos / self.batch_size))
@@ -339,7 +347,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
         return x, y
 
-    def get_combo(self, i):
+    def get_combo(self, i: int) -> tf.Tensor:
         return self.combos.skip(i).take(1).get_single_element()
 
     def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
