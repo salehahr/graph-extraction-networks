@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -110,8 +110,8 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
     def on_epoch_end(self):
         self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
-    def _get_data(self, i: int):
-        skel_fps, graph_fps = self._get_batch_fps(i)
+    def _get_data(self, i: Optional[int] = None):
+        skel_fps, graph_fps = self._get_fps(i)
 
         skel_imgs = skel_fps.map(to_skel_img, num_parallel_calls=tf.data.AUTOTUNE)
         node_pos, degrees, node_types, adj_matr = self._get_graph_data(graph_fps)
@@ -127,11 +127,16 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 
         return skel_imgs, node_pos, degrees, node_types, adj_matr
 
-    def _get_batch_fps(self, i: int) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
-        """Returns filepaths of the batch (skeletonised images and graphs)."""
-        skel_fps = self.ds.skip(i).take(1).unbatch()
+    def _get_fps(self, i: Optional[int] = None):
+        """
+        Returns filepaths of the skeletonised images and graphs.
+        :param i: batch id (optional)
+        """
 
-        def skel_to_graph(skel_fp):
+        skel_fps = self.ds if i is None else self.ds.skip(i).take(1)
+        skel_fps = skel_fps.unbatch()
+
+        def skel_to_graph(skel_fp: tf.string):
             graph_fp = tf.strings.regex_replace(skel_fp, "skeleton", "graphs")
             graph_fp = tf.strings.regex_replace(graph_fp, r"\.png", ".json")
             return graph_fp
