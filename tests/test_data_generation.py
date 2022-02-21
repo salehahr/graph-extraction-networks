@@ -147,7 +147,7 @@ class TestEdgeDGSingle(unittest.TestCase):
         x, y = graph_data[step_num]
 
         cls.training_data = EdgeDGSingle(
-            cls.config, cls.network, TestType.TRAINING, *x, y, with_path=True
+            cls.config, TestType.TRAINING, *x, y, with_path=True
         )
 
     def test_input_data(self):

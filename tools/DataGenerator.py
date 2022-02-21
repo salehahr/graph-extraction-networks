@@ -57,7 +57,6 @@ def get_eedg(
             x, y = graph_data[test][step_num]
             data = EdgeDGSingle(
                 config,
-                config.network.edge_extraction,
                 test,
                 *x,
                 y,
@@ -296,7 +295,6 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def __init__(
         self,
         config: Config,
-        network: InputConfig,
         test_type: TestType,
         skel_img: tf.Tensor,
         node_pos: tf.Tensor,
@@ -323,10 +321,11 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
 
         # dimensions
-        self.batch_size = config.node_pairs_in_batch
-        self.img_dims = config.img_dims
+        network: InputConfig = config.network.edge_extraction
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
+        self.batch_size = config.node_pairs_in_batch
+        self.img_dims = config.img_dims
 
         # shuffle before batching
         all_combos = self._get_all_combinations()
