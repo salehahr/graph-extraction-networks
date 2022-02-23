@@ -309,31 +309,30 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
         # shuffle before batching
         all_combos = self._get_all_combinations()
-        self.all_combos_unbatched = all_combos.shuffle(
-            self.max_combinations, reshuffle_each_iteration=False
-        )
+        self.unbatched_combos = self._get_reduced_combinations(all_combos, shuffle=True)
+        self.num_combos = len(list(self.unbatched_combos.as_numpy_iterator()))
 
         # shuffle
         self.on_epoch_end()
 
     @property
-    def all_combos(self):
-        return self.all_combos_unbatched.batch(self.batch_size)
+    def combos(self):
+        return self.unbatched_combos.batch(self.batch_size)
 
     def on_epoch_end(self):
-        self.all_combos_unbatched = self.all_combos_unbatched.shuffle(
-            self.max_combinations, reshuffle_each_iteration=False
+        self.unbatched_combos = self._get_reduced_combinations(
+            self.unbatched_combos, shuffle=True
         )
 
     def __len__(self):
         """Denotes the number of batches per epoch
         i.e. number of steps per epoch."""
-        return int(np.floor(self.max_combinations / self.batch_size))
+        return int(np.floor(self.num_combos / self.batch_size))
 
     def __getitem__(
         self, i: int
     ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
-        batch_combo = self.all_combos.skip(i).take(1).unbatch()
+        batch_combo = self.combos.skip(i).take(1).unbatch()
 
         x = self._get_combo_img(batch_combo)
         y = self._get_labels(batch_combo)
@@ -341,7 +340,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         return x, y
 
     def get_combo(self, i):
-        return self.all_combos.skip(i).take(1).get_single_element()
+        return self.combos.skip(i).take(1).get_single_element()
 
     def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
         def to_combo_img(pair: tf.Tensor):
@@ -387,6 +386,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
 
         return adj if not self.with_path else (adj, path)
 
+    @tf.function
     def _get_adjacency(self, pair: tf.Tensor) -> tf.Tensor:
         n1, n2 = pair[0], pair[1]
         return self.adj_matr[n1, n2]
@@ -419,3 +419,41 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         all_combos = all_combos[1:, :]
 
         return tf.data.Dataset.from_tensor_slices(all_combos)
+
+    def _get_reduced_combinations(
+        self, all_combos: tf.data.Dataset, shuffle: bool = True
+    ) -> tf.data.Dataset:
+        """Returns a dataset of node combinations that have equal amounts of
+        adjacent and non-adjacent node pairs. The dataset elements are
+        in alternating order: adj > not adj > adj > not adj > ..."""
+
+        # categorise according to adjacency
+        adj_combos = all_combos.filter(self._is_adj)
+        not_adj_combos = all_combos.filter(self._is_not_adj)
+
+        if shuffle:
+            adj_combos = adj_combos.shuffle(
+                self.max_combinations, seed=12, reshuffle_each_iteration=False
+            )
+            not_adj_combos = not_adj_combos.shuffle(
+                self.max_combinations, seed=13, reshuffle_each_iteration=False
+            )
+
+        # zip cuts off not_adj combinations at the same number of elements as adj
+        reduced_combos = tf.data.Dataset.zip((adj_combos, not_adj_combos)).flat_map(
+            lambda x0, x1: tf.data.Dataset.from_tensors(x0).concatenate(
+                tf.data.Dataset.from_tensors(x1)
+            )
+        )
+
+        return reduced_combos
+
+    @tf.function
+    def _is_adj(self, pair: tf.Tensor) -> tf.bool:
+        adj = self._get_adjacency(pair)
+        return tf.math.equal(adj, tf.constant(1))
+
+    @tf.function
+    def _is_not_adj(self, pair: tf.Tensor) -> bool:
+        adj = self._get_adjacency(pair)
+        return tf.math.equal(adj, 0)

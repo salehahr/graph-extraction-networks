@@ -164,9 +164,11 @@ class TestEdgeExtractionDG(unittest.TestCase):
     def test_output_data(self):
         step_num = 0
         _, (adjacency, path) = self.training_data[step_num]
+        assert self.training_data.batch_size > 1
 
         adjacency = adjacency.numpy()
         self.assertEqual(adjacency.shape, (self.training_data.batch_size, 1))
+        self._check_alternating(adjacency)
 
         path = [p[0] for p in path.numpy()]
         self.assertEqual(adjacency.shape[0], self.training_data.batch_size)
@@ -179,9 +181,23 @@ class TestEdgeExtractionDG(unittest.TestCase):
             self.assertTrue(is_normalised)
             self.assertEqual(np.max(p), a)
 
+    @staticmethod
+    def _check_alternating(adjacencies):
+        for i, adj in enumerate(adjacencies.squeeze()):
+            is_odd = i % 2 == 1
+            if is_odd:
+                assert adj == 0
+            else:
+                assert adj == 1
+
     def test_all_combinations(self):
         combos = self.training_data._get_all_combinations().as_numpy_iterator()
         assert len(list(combos)) == self.training_data.max_combinations
+
+    def test_reduced_combinations(self):
+        all_combos = self.training_data._get_all_combinations().as_numpy_iterator()
+        combos = self.training_data.unbatched_combos.as_numpy_iterator()
+        assert len(list(combos)) < len(list(all_combos))
 
     def _choose_step_num(self):
         """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
@@ -203,7 +219,7 @@ class TestEdgeExtractionDG(unittest.TestCase):
         step_num = self._choose_step_num()
 
         pos_list = self.training_data.pos_list.numpy()
-        combos = self.training_data.get_combo(step_num).numpy()
+        combos = self.training_data.get_combo(0).numpy()
 
         pairs_xy = [pos_list[combo] for combo in combos]
 
