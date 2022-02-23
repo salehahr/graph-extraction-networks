@@ -50,7 +50,6 @@ class Config(BaseModel):
 
     validation_fraction: float
     batch_size: int
-    node_pairs_in_batch: int
     use_small_dataset: bool = False
     max_files: Optional[int] = None
 
@@ -133,6 +132,19 @@ class Config(BaseModel):
         return self.dataset.skip(self.num_train)
 
 
+class RunParams(BaseModel):
+    epochs: int
+    batch_size: Optional[int] = None
+    node_pairs_in_batch: Optional[int] = None
+
+    n_filters: Optional[int] = None
+    n_conv2_blocks: Optional[int] = None
+    n_conv3_blocks: Optional[int] = None
+
+    def __init__(self, data):
+        super(RunParams, self).__init__(**data)
+
+
 class RunConfig(BaseModel):
     # user input in .yaml file
     project: str
@@ -145,12 +157,15 @@ class RunConfig(BaseModel):
 
     model_filename: str
 
-    parameters: dict
+    parameters: Union[dict, RunParams]
     sweep_config: Optional[dict]
 
     # derived
     data_config: Optional[Config] = None
     weights_path: Optional[str] = None
+
+    batch_size: Optional[int] = None
+    node_pairs_in_batch: Optional[int] = None
 
     @validator("run_type")
     def set_run_type(cls, v: str) -> TestType:
@@ -160,6 +175,10 @@ class RunConfig(BaseModel):
             return TestType.TESTING
         else:
             raise Exception
+
+    @validator("parameters")
+    def set_run_params(cls, v):
+        return RunParams(v)
 
     def __init__(
         self, filepath: str, name: str = None, data_config: Optional[Config] = None
@@ -178,3 +197,18 @@ class RunConfig(BaseModel):
             self.weights_path = os.path.join(
                 data_config.base_path, f"weights_{self.run_name}.hdf5"
             )
+
+            self.batch_size = (
+                self.parameters.batch_size
+                if self.parameters.batch_size is not None
+                else data_config.batch_size
+            )
+            self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
+
+    @property
+    def images_in_batch(self):
+        return self.batch_size
+
+    @property
+    def node_pairs_in_image(self):
+        return self.node_pairs_in_batch

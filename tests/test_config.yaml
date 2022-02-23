@@ -20,7 +20,6 @@ save_path: /graphics/scratch/schuelej/sar/data/256/results
 
 validation_fraction: 0.1
 batch_size: 3
-node_pairs_in_batch: 3
 
 use_small_dataset: true
 max_files: 30 # integer if above is true, else none

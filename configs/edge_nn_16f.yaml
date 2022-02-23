@@ -13,6 +13,8 @@ model_filename: model.h5
 
 
 parameters:
+  batch_size: 16
+  node_pairs_in_batch: 256
   n_filters: 16
   n_conv2_blocks: 2
   n_conv3_blocks: 3
