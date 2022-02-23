@@ -359,10 +359,6 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
     def _get_labels(
         self, batch_combo: tf.data.Dataset
     ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
-        def get_adjacency(pair: tf.Tensor) -> tf.Tensor:
-            n1, n2 = pair[0], pair[1]
-            return self.adj_matr[n1, n2]
-
         def to_path(adjacency: tf.Tensor, pair: tf.Tensor):
             rc1, rc2 = self._to_coords(pair)
             row_indices = tf.sort([rc1[0], rc2[0]])
@@ -378,7 +374,7 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
                 tf.RaggedTensor.from_tensor(img_section),
             )
 
-        adj = batch_combo.map(get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
+        adj = batch_combo.map(self._get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
         path = None
 
         if self.with_path:
@@ -390,6 +386,10 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         adj = tf.reshape(rebatch(adj, self.batch_size), [self.batch_size, 1])
 
         return adj if not self.with_path else (adj, path)
+
+    def _get_adjacency(self, pair: tf.Tensor) -> tf.Tensor:
+        n1, n2 = pair[0], pair[1]
+        return self.adj_matr[n1, n2]
 
     def _to_coords(self, pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         xy1 = self.pos_list[pair[0], :]
@@ -404,11 +404,13 @@ class EdgeExtractionDG(tf.keras.utils.Sequence):
         n = self.num_nodes
         indices = tf.range(n)
 
+        # meshgrid to create all possible pair combinations
         y, x = tf.meshgrid(indices, indices)
         x = tf.expand_dims(x, 2)
         y = tf.expand_dims(y, 2)
         z = tf.concat([x, y], axis=2)
 
+        # extract the upper triangular part of the meshgrid
         all_combos = tf.constant([[0, 0]])  # placeholder
         for x in range(n - 1):
             # goes from 0 to n - 2
