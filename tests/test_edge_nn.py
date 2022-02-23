@@ -24,7 +24,9 @@ class TestEdgeNN(unittest.TestCase):
         cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
         cls.graph_data = get_gedg(cls.config, batch_size=1)
-        edge_data = get_eedg(cls.config, cls.graph_data)
+        edge_data = get_eedg(
+            cls.config, cls.run_config.node_pairs_in_batch, cls.graph_data
+        )
         cls.training_data = edge_data[TestType.TRAINING]
         cls.validation_data = edge_data[TestType.VALIDATION]
 
@@ -48,7 +50,9 @@ class TestEdgeNN(unittest.TestCase):
     def test_train(self) -> None:
         run.start(self.run_config)
 
-        data = get_eedg(self.config, self.graph_data)
+        data = get_eedg(
+            self.config, self.run_config.node_pairs_in_batch, self.graph_data
+        )
         run.train(self.model, data, debug=True)
         run.predict(self.model, self.validation_data, max_pred=3, alternate=True)
 
@@ -72,7 +76,12 @@ class TestEdgeNN(unittest.TestCase):
             )
 
             # generate node combinations
-            edge_data = get_eedg(self.config, self.graph_data, step_num=i)
+            edge_data = get_eedg(
+                self.config,
+                self.run_config.node_pairs_in_batch,
+                self.graph_data,
+                step_num=i,
+            )
 
             # init model/reload model on resumed run
             model_ = run.load_model(self.config, self.run_config, model_=model_)

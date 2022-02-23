@@ -7,6 +7,7 @@ from tools import (
     EdgeDGSingle,
     GraphExtractionDG,
     NodeExtractionDG,
+    RunConfig,
     TestType,
     get_gedg,
 )
@@ -139,6 +140,10 @@ class TestEdgeDGSingle(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.run_config = RunConfig(
+            "test_wandb_config_edge.yaml", data_config=cls.config
+        )
+
         cls.config.batch_size = 1
         cls.network = cls.config.network.edge_extraction
 
@@ -147,7 +152,12 @@ class TestEdgeDGSingle(unittest.TestCase):
         x, y = graph_data[step_num]
 
         cls.training_data = EdgeDGSingle(
-            cls.config, TestType.TRAINING, *x, y, with_path=True
+            cls.config,
+            cls.run_config.node_pairs_in_batch,
+            TestType.TRAINING,
+            *x,
+            y,
+            with_path=True,
         )
 
     def test_input_data(self):

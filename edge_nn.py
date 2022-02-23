@@ -23,7 +23,9 @@ if __name__ == "__main__":
         run.start(run_config, resume=do_resume, reinit=True, _id=old_run_id)
 
         # generate node combinations
-        edge_data = get_eedg(data_config, graph_data, step_num=i)
+        edge_data = get_eedg(
+            data_config, run_config.node_pairs_in_batch, graph_data, step_num=i
+        )
 
         # init model/reload model on resumed run
         edge_nn = run.load_model(data_config, run_config, model_=edge_nn)

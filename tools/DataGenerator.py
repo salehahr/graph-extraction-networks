@@ -21,7 +21,7 @@ from tools.image import gen_pos_indices_img
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
-    from tools.config import Config, InputConfig
+    from tools.config import Config, InputConfig, RunConfig
 
 
 def to_skel_img(fp):
@@ -47,7 +47,10 @@ def get_gedg(
 
 
 def get_eedg(
-    config, graph_data: Dict[TestType, GraphExtractionDG], step_num: int = 0
+    config,
+    num_node_pairs: int,
+    graph_data: Dict[TestType, GraphExtractionDG],
+    step_num: int = 0,
 ) -> Dict[TestType, EdgeDGSingle]:
     """Returns training/validation data for Edge NN."""
 
@@ -57,6 +60,7 @@ def get_eedg(
             x, y = graph_data[test][step_num]
             data = EdgeDGSingle(
                 config,
+                num_node_pairs,
                 test,
                 *x,
                 y,
@@ -295,6 +299,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def __init__(
         self,
         config: Config,
+        node_pairs_in_batch: int,
         test_type: TestType,
         skel_img: tf.Tensor,
         node_pos: tf.Tensor,
@@ -324,7 +329,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         network: InputConfig = config.network.edge_extraction
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
-        self.batch_size = config.node_pairs_in_batch
+        self.batch_size = node_pairs_in_batch
         self.img_dims = config.img_dims
 
         # shuffle before batching
