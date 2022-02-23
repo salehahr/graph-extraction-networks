@@ -8,7 +8,6 @@ import numpy as np
 import tensorflow as tf
 
 from tools.adj_matr import transform_adj_matr
-from tools.colours import rgb_red
 from tools.data import (
     fp_to_adj_matr,
     fp_to_grayscale_img,
@@ -294,6 +293,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     """
     Generates node combinations and corresponding labels (path and adjacency)
     from a single skeletonised image.
+    Shuffling occurs in self._get_reduced_combinations, used the self.seed attribute.
     """
 
     def __init__(
@@ -306,24 +306,23 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         degrees: tf.Tensor,
         adj_matr: tf.RaggedTensor,
         with_path: bool,
+        seed: Optional[int] = None,
     ):
         self.test_type = test_type
         self.with_path = with_path
+        self.seed = seed
 
         self.skel_img = tf.squeeze(skel_img)
         self.node_pos = tf.squeeze(node_pos)
         self.degrees = tf.squeeze(degrees)
-        self.adj_matr = adj_matr[0]
+
+        if adj_matr.shape.ndims == 3:
+            self.adj_matr = adj_matr[0]
+        elif adj_matr.shape.ndims == 2:
+            self.adj_matr = adj_matr
 
         # derived data
-        self.skel_img_rgb = tf.stack(
-            [self.skel_img, self.skel_img, self.skel_img], axis=-1
-        )
         self.pos_list = sorted_pos_list_from_image(self.node_pos)
-
-        n = tf.shape(self.pos_list)[0]
-        self.num_nodes = n
-        self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
 
         # dimensions
         network: InputConfig = config.network.edge_extraction
@@ -331,6 +330,11 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self.output_channels = network.output_channels
         self.batch_size = node_pairs_in_batch
         self.img_dims = config.img_dims
+
+        # node combinations
+        n = tf.shape(self.pos_list)[0]
+        self.num_nodes = n
+        self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
 
         # shuffle before batching
         all_combos = self._get_all_combinations()
@@ -370,12 +374,12 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
         def to_combo_img(pair: tf.Tensor):
             rc1, rc2 = self._to_coords(pair)
-            img = tf.Variable(self.skel_img_rgb)
+            img = tf.Variable(lambda: tf.zeros(tf.shape(self.skel_img)))
 
-            img[rc1[0], rc1[1], :].assign(rgb_red)
-            img[rc2[0], rc2[1], :].assign(rgb_red)
+            img[rc1[0], rc1[1]].assign(1)
+            img[rc2[0], rc2[1]].assign(1)
 
-            return img
+            return tf.stack([self.skel_img, img], axis=-1)
 
         imgs = batch_combo.map(to_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
         return rebatch(imgs, self.batch_size)
@@ -457,11 +461,14 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         not_adj_combos = all_combos.filter(self._is_not_adj)
 
         if shuffle:
+            seed = self.seed if self.seed is not None else 12
             adj_combos = adj_combos.shuffle(
-                self.max_combinations, seed=12, reshuffle_each_iteration=False
+                self.max_combinations, seed=seed, reshuffle_each_iteration=False
             )
             not_adj_combos = not_adj_combos.shuffle(
-                self.max_combinations, seed=13, reshuffle_each_iteration=False
+                self.max_combinations,
+                seed=seed + 1,
+                reshuffle_each_iteration=False,
             )
 
         # zip cuts off not_adj combinations at the same number of elements as adj

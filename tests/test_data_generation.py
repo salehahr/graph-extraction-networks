@@ -167,7 +167,7 @@ class TestEdgeDGSingle(unittest.TestCase):
         img = img[0].numpy()
         is_normalised = np.max(img) <= 1
         self.assertTrue(is_normalised)
-        self.assertEqual(img.shape, (256, 256, 3))
+        self.assertEqual(img.shape, (256, 256, 2))
         self.assertEqual(img.dtype, np.float32)
 
     def test_output_data(self):

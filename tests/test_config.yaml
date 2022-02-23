@@ -7,7 +7,7 @@ network:
     output_channels: 3
   edge_extraction:
     id: 3
-    input_channels: 3
+    input_channels: 2
     output_channels: 1
   graph_extraction:
     id: 4

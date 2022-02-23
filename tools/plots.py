@@ -156,7 +156,7 @@ def plot_sample_edge_nn(
     rows = np.sort([rc1[0], rc2[0]])
     cols = np.sort([rc1[1], rc2[1]])
 
-    img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1]
+    img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1, 0]
     plt.subplot(num_rows, num_cols, get_subplot_id(row, 0, num_cols))
     plot_img(img_section, cmap="gray")
     plt.xlabel(f"RC {rc1} - {rc2}")
