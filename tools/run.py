@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
 
@@ -9,7 +10,7 @@ from wandb.integration.keras import WandbCallback
 from model import VGG16
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
-from tools.postprocessing import eedg_coordinates, eedg_predict
+from tools.postprocessing import eedg_predict
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
@@ -106,6 +107,7 @@ def train(
     model_: Union[VGG16, UNet],
     data: Dict[TestType, Any],
     epochs: Optional[int] = None,
+    steps_in_epoch: Optional[int] = None,
     test_type: TestType = TestType.TRAINING,
     debug: bool = False,
 ) -> tf.keras.callbacks.History:
@@ -115,7 +117,7 @@ def train(
         data[TestType.VALIDATION] if test_type is TestType.TRAINING else None
     )
 
-    num_steps = 3 if debug is True else None
+    num_steps = 3 if debug is True else steps_in_epoch
 
     history = model_.fit(
         x=data[test_type],
@@ -143,39 +145,55 @@ def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
 def predict(
     model_: VGG16,
     val_data: EdgeDGSingle,
-    max_pred: int = 3,
-    alternate: bool = False,
+    max_pred: int = 5,
     only_adj_nodes: bool = True,
 ):
     prediction = wandb.Artifact(f"run_{wandb.run.id}", type="predictions")
     table = wandb.Table(columns=["adj_pred", "adj_true", "image"])
 
-    orig_batch_size = val_data.batch_size
-    val_data.batch_size = 1
-
     step_num = 0
-    for i in range(max_pred):
-        if alternate:
-            # Alternate between positive and negative adjacencies
-            pick_adj = True if (i % 2 == 0) else False
-            step_num = choose_step_num(val_data, step_num=step_num, pick_adj=pick_adj)
+    max_steps = math.ceil(max_pred / val_data.node_pairs_batch)
+
+    for i in range(max_steps):
+        if only_adj_nodes:
+            # Only show predictions for adjacent nodes
+            step_num = choose_step_num(val_data, step_num=step_num, pick_adj=True)
         else:
-            if not only_adj_nodes:
-                step_num = i
-            else:
-                # Only show predictions for adjacent nodes
-                step_num = choose_step_num(val_data, step_num=step_num, pick_adj=True)
+            step_num = i
 
         adj_true, adj_pred = eedg_predict(val_data, model_, step_num)
-        pairs_xy = eedg_coordinates(val_data, step_num)
 
-        rgb_img = plot_node_pairs_on_skel(val_data.skel_img, pairs_xy)
+        num_images = val_data.batch_size
+        num_combos = val_data.node_pairs_image
 
-        table.add_data(int(adj_pred), int(adj_true), wandb.Image(rgb_img))
+        combo_img, _ = val_data[step_num]
+        pos_lists = [p.numpy() for p in val_data.get_pos_list(step_num)]
+        combos = val_data.get_combo(step_num).numpy()
+
+        for ii in range(num_images):
+            idx = ii * num_images
+
+            im_combos = combos[idx : idx + num_combos]
+            pos_list = pos_lists[ii]
+
+            skel_img = combo_img[idx].numpy()[:, :, 0]
+            pairs_xy = pos_list[im_combos]
+
+            for iii in range(num_combos):
+                rgb_img = plot_node_pairs_on_skel(skel_img, [pairs_xy[iii]], show=True)
+                table.add_data(
+                    int(adj_pred[idx]), int(adj_true[idx]), wandb.Image(rgb_img)
+                )
+
+                idx += 1
+                if idx >= max_pred:
+                    break
+
+            if idx >= max_pred:
+                break
 
         step_num += 1
 
-    val_data.batch_size = orig_batch_size
     prediction.add(table, "predictions")
 
     wandb.log_artifact(prediction)
