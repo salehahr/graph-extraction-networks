@@ -13,6 +13,7 @@ from tools.data import (
     fp_to_grayscale_img,
     fp_to_node_attributes,
     get_data_at_xy,
+    rc_to_node_combo_img,
     rebatch,
     sorted_pos_list_from_image,
 )
@@ -528,17 +529,22 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         return self.combos.skip(i).take(1).get_single_element()
 
     def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
-        def to_combo_img(pair: tf.Tensor):
-            rc1, rc2 = self._to_coords(pair)
-            img = tf.Variable(lambda: tf.zeros(tf.shape(self.skel_img)))
+        def to_node_combo_img(rc1, rc2):
+            return tf.numpy_function(
+                rc_to_node_combo_img, inp=[rc1, rc2, self.skel_img.shape], Tout=tf.int64
+            )
 
-            img[rc1[0], rc1[1]].assign(1)
-            img[rc2[0], rc2[1]].assign(1)
+        skel_int = tf.cast(self.skel_img, tf.int64)
+        combo_imgs = (
+            batch_combo.map(self._to_coords, num_parallel_calls=tf.data.AUTOTUNE)
+            .map(to_node_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
+            .map(
+                lambda x: tf.stack([skel_int, x], axis=-1),
+                num_parallel_calls=tf.data.AUTOTUNE,
+            )
+        )
 
-            return tf.stack([self.skel_img, img], axis=-1)
-
-        imgs = batch_combo.map(to_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
-        return rebatch(imgs, self.batch_size)
+        return rebatch(combo_imgs, self.batch_size)
 
     def _get_labels(
         self, batch_combo: tf.data.Dataset

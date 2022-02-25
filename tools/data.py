@@ -107,6 +107,19 @@ def get_data_at_xy(matr: np.ndarray) -> np.ndarray:
     return matr[rc[:, 0], rc[:, 1]] - 1
 
 
+def rc_to_node_combo_img(
+    rc1: np.ndarray, rc2: np.ndarray, dims: np.ndarray
+) -> np.ndarray:
+    """ "Converts a pair of (row, col) coordinates to a blank image
+    with white dots corresponding to the given coordinates."""
+    img = np.zeros(dims, dtype=np.int64)
+
+    img[rc1[0], rc1[1]] = 1
+    img[rc2[0], rc2[1]] = 1
+
+    return img
+
+
 def rebatch(x: tf.data.Dataset, batch_size: int) -> tf.Tensor:
     return (
         x.batch(batch_size, num_parallel_calls=tf.data.AUTOTUNE)
