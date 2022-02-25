@@ -206,9 +206,9 @@ class RunConfig(BaseModel):
             self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
 
     @property
-    def images_in_batch(self):
+    def images_in_batch(self) -> int:
         return self.batch_size
 
     @property
-    def node_pairs_in_image(self):
+    def node_pairs_in_image(self) -> int:
         return self.node_pairs_in_batch

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import cv2
 import networkx as nx
@@ -12,6 +12,9 @@ from tools.image import classifier_preview, colour_enums, draw_circles, get_rgb
 from tools.NetworkType import NetworkType
 from tools.node_classifiers import NodeDegrees
 from tools.postprocessing import classify, eedg_coordinates, eedg_predict
+
+if TYPE_CHECKING:
+    from tools import EdgeDGMultiple, EdgeDGSingle
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -144,7 +147,11 @@ def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int, **kwa
 
 
 def plot_sample_edge_nn(
-    data_generator, step_num: int, row: int, num_rows: int, **kwargs
+    data_generator: Union[EdgeDGSingle, EdgeDGMultiple],
+    step_num: int,
+    row: int,
+    num_rows: int,
+    **kwargs,
 ):
     multiple_imgs = False
     if "multiple" in kwargs.keys() and kwargs["multiple"] is True:
@@ -180,7 +187,7 @@ def plot_sample_edge_nn(
     else:
         pos_lists = data_generator.get_pos_list(step_num)
         combos = data_generator.get_combo(step_num).numpy()
-        num_imgs = data_generator.batch_size
+        num_imgs = data_generator.images_in_batch
         num_combos = data_generator.node_pairs_image
 
         for i in range(num_imgs):

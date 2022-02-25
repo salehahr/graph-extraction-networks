@@ -279,6 +279,37 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
     """
     Generates node combinations and corresponding labels (path and adjacency)
     across multiple skeletonised images.
+
+    One batch contains several images.
+    - One image has n = node_pairs_in_image combinations.
+    - One image has one pos_list.
+
+    e.g. for
+        total_images = 24
+        images_in_batch = 3
+        node_pairs_in_image = 4
+        ----------
+        num_batches = 24 / 3 = 8
+        effective_batch_size = 3 * 4 = 12
+
+    self.combos[batch_num] = [
+        0: [12x2] as tf.Tensor
+        1: [12x2]
+        .
+        .
+        8: [12x2]
+    ]
+
+    self.pos_list[batch_num][img_num_in_batch] = [
+        0:  [
+                0: [pos...]     of img 0 in batch, given as tf.Tensor
+                1: [pos...]
+                2: [pos...]
+            ]
+        .
+        .
+        8: [ ... ]
+    ]
     """
 
     def __init__(
@@ -294,58 +325,61 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
         self.with_path = with_path
 
         self.gedg = gedg
+        self.num_batches = len(self.gedg)
 
         # dimensions
         network = config.network.edge_extraction
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
-        self._batch_size = run_config.images_in_batch
-        self.node_pairs_image = run_config.node_pairs_in_image
-        self.node_pairs_batch = self.batch_size * self.node_pairs_image
         self.img_dims = config.img_dims
 
-        # derived data
-        self.combos: List[Optional[tf.Tensor]] = [None] * len(self.gedg)
-        self.pos_list: List[Optional[List[tf.Tensor]]] = [None] * len(self.gedg)
+        # batch size
+        self.images_in_batch: int = run_config.images_in_batch
+        self.node_pairs_image: int = run_config.node_pairs_in_image
+        self.node_pairs_batch: int = self.images_in_batch * self.node_pairs_image
+
+        # derived data across all batches
+        self.combos: List[Optional[tf.Tensor]] = [None] * self.num_batches
+        self.pos_list: List[Optional[List[tf.Tensor]]] = [None] * self.num_batches
 
         # shuffle
         self.on_epoch_end()
 
         # checks
-        assert self.gedg.batch_size == self._batch_size
+        assert self.gedg.batch_size == self.batch_size
 
     @property
-    def batch_size(self):
-        return self._batch_size
+    def batch_size(self) -> int:
+        return self.images_in_batch
 
-    @batch_size.setter
-    def batch_size(self, value):
-        self._batch_size = value
-        self.gedg.batch_size = value
+    @property
+    def effective_batch_size(self) -> int:
+        return self.node_pairs_batch
 
     def on_epoch_end(self):
         self.gedg.on_epoch_end()
 
     def __len__(self):
-        return len(self.gedg)
+        """One step in an epoch corresponds to the same step in the GEDG object."""
+        return self.num_batches
 
     def __getitem__(
         self, i: int
     ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
         (skel_imgs, node_positions, degrees), adj_matrs = self.gedg[i]
 
-        # placeholders
-        pos_list = [None] * self.batch_size
-        combos = [None] * self.batch_size
-        combo_imgs = [None] * self.batch_size
-        adjacencies = [None] * self.batch_size
-        paths = [None] * self.batch_size
+        # placeholders for data across images in gedg batch
+        pos_list = [None] * self.images_in_batch
+        combos = [None] * self.images_in_batch
+        combo_imgs = [None] * self.images_in_batch
+        adjacencies = [None] * self.images_in_batch
+        paths = [None] * self.images_in_batch
 
         # iterate over the images (num images = self.batch_size)
         for ii, data in enumerate(zip(skel_imgs, node_positions, degrees, adj_matrs)):
             skel_img, node_pos, degree, adj_matr = data
 
-            # eedg_single returns node combinations (num combos = self.node_pairs_image)
+            # eedg_single returns node combinations (n = node_pairs_image)
             eedg_single = EdgeDGSingle(
                 self.config,
                 self.node_pairs_image,
@@ -369,8 +403,22 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
             else:
                 adjacencies[ii] = y
 
+        # fill lists of derived data at current batch number
         self.pos_list[i] = pos_list
         self.combos[i] = tf.concat(combos, axis=0)
+
+        # actual outputs of the data generator
+        """
+        images_in_batch x node_pairs_in_image combinations.
+        e.g. for
+            images_in_batch = 3
+            node_pairs_in_image = 4
+            ----------
+            effective_batch_size = 12
+
+        size(combo_imgs) = 12 x 256 x 256 x 2
+        size(adjacencies) = 12 x 1
+        """
         combo_imgs = tf.concat(combo_imgs, axis=0)
         adjacencies = tf.concat(adjacencies, axis=0)
 
