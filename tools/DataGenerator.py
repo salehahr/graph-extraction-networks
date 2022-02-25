@@ -28,9 +28,8 @@ def to_skel_img(fp):
 
 
 def get_gedg(
-    config, batch_size: Optional[int] = None
+    config: Config, batch_size: Optional[int] = None
 ) -> Dict[TestType, GraphExtractionDG]:
-    """Returns GraphExtractionDG with a default batch size of 1."""
     g_network = config.network.graph_extraction
     orig_batch_size = config.batch_size
 
@@ -46,12 +45,16 @@ def get_gedg(
 
 
 def get_eedg(
-    config: Config, run_config: RunConfig, graph_data: Dict[TestType, GraphExtractionDG]
-) -> Dict[TestType, EdgeDGSingle]:
+    config: Config,
+    run_config: RunConfig,
+    graph_data: Optional[Dict[TestType, GraphExtractionDG]] = None,
+    with_path: Optional[bool] = False,
+) -> Dict[TestType, EdgeDGMultiple]:
     """Returns training/validation data for Edge NN."""
+    graph_data = get_gedg(config) if graph_data is None else graph_data
 
     return {
-        test: EdgeDGMultiple(config, run_config, graph_data[test], with_path=False)
+        test: EdgeDGMultiple(config, run_config, graph_data[test], with_path=with_path)
         for test in TestType
     }
 
