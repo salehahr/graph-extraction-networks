@@ -285,7 +285,7 @@ class TestEdgeDGMultiple(unittest.TestCase):
         is_normalised = np.max(combo_img) <= 1
         self.assertTrue(is_normalised)
         self.assertEqual(combo_img.shape, (256, 256, 2))
-        self.assertEqual(combo_img.dtype, np.int64)
+        self.assertEqual(combo_img.dtype, np.int32)
 
         # visual test
         skel_part = combo_img[..., 0]

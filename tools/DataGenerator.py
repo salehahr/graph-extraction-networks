@@ -370,11 +370,12 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
         (skel_imgs, node_positions, degrees), adj_matrs = self.gedg[i]
 
         # placeholders for data across images in gedg batch
-        pos_list = [None] * self.images_in_batch
-        combos = [None] * self.images_in_batch
-        combo_imgs = [None] * self.images_in_batch
-        adjacencies = [None] * self.images_in_batch
-        paths = [None] * self.images_in_batch
+        num_images = skel_imgs.shape[0]
+        pos_list = [None] * num_images
+        combos = [None] * num_images
+        combo_imgs = [None] * num_images
+        adjacencies = [None] * num_images
+        paths = [None] * num_images
 
         # iterate over the images (num images = self.batch_size)
         for ii, data in enumerate(zip(skel_imgs, node_positions, degrees, adj_matrs)):
@@ -495,30 +496,23 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
 
         # shuffle before batching
         all_combos = self._get_all_combinations()
-        self.unbatched_combos = self._get_reduced_combinations(all_combos, shuffle=True)
-        self.num_combos = len(list(self.unbatched_combos.as_numpy_iterator()))
+        self.combos = self._get_reduced_combinations(all_combos, shuffle=True)
 
         # shuffle
         self.on_epoch_end()
 
-    @property
-    def combos(self) -> tf.data.Dataset:
-        return self.unbatched_combos.batch(self.batch_size)
-
     def on_epoch_end(self):
-        self.unbatched_combos = self._get_reduced_combinations(
-            self.unbatched_combos, shuffle=True
-        )
+        self.combos = self._get_reduced_combinations(self.combos, shuffle=True)
 
     def __len__(self) -> int:
-        """Denotes the number of batches per epoch
-        i.e. number of steps per epoch."""
-        return int(np.floor(self.num_combos / self.batch_size))
+        return 1
 
     def __getitem__(
         self, i: int
     ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
-        batch_combo = self.combos.skip(i).take(1).unbatch()
+        batch_combo = self.combos[
+            i * self.batch_size : i * self.batch_size + self.batch_size
+        ]
 
         x = self._get_combo_img(batch_combo)
         y = self._get_labels(batch_combo)
@@ -526,40 +520,33 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         return x, y
 
     def get_combo(self, i: int) -> tf.Tensor:
-        return self.combos.skip(i).take(1).get_single_element()
+        combo = self.combos[i * self.batch_size : i * self.batch_size + self.batch_size]
+        return tf.stack(combo)
 
     def _get_combo_img(self, batch_combo: tf.Tensor) -> tf.Tensor:
-        def to_node_combo_img(rc1, rc2):
-            return tf.numpy_function(
-                rc_to_node_combo_img, inp=[rc1, rc2, self.skel_img.shape], Tout=tf.int64
-            )
+        coords = [self._to_coords(p) for p in batch_combo]
+        node_pair_imgs = [
+            rc_to_node_combo_img(rc1, rc2, self.skel_img.shape) for (rc1, rc2) in coords
+        ]
+        combo_imgs = [
+            np.stack([self.skel_img, np_im], axis=-1).astype(np.uint8)
+            for np_im in node_pair_imgs
+        ]
 
-        skel_int = tf.cast(self.skel_img, tf.int64)
-        combo_imgs = (
-            batch_combo.map(self._to_coords, num_parallel_calls=tf.data.AUTOTUNE)
-            .map(to_node_combo_img, num_parallel_calls=tf.data.AUTOTUNE)
-            .map(
-                lambda x: tf.stack([skel_int, x], axis=-1),
-                num_parallel_calls=tf.data.AUTOTUNE,
-            )
-        )
-
-        return rebatch(combo_imgs, self.batch_size)
+        return tf.stack(combo_imgs)
 
     def _get_labels(
-        self, batch_combo: tf.data.Dataset
+        self, batch_combo: tf.Tensor
     ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
 
-        adj = batch_combo.map(self._get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
+        adj = [self._get_adjacency(c) for c in batch_combo]
+
         path = None
-
         if self.with_path:
-            path = tf.data.Dataset.zip((adj, batch_combo)).map(
-                self._to_path, num_parallel_calls=tf.data.AUTOTUNE
-            )
-            path = rebatch(path, self.batch_size)
+            path = [self._to_path(a, c) for (a, c) in zip(adj, batch_combo)]
+            path = tf.stack(path)
 
-        adj = tf.reshape(rebatch(adj, self.batch_size), [self.batch_size, 1])
+        adj = tf.reshape(tf.stack(adj), [self.batch_size, 1])
 
         return adj if not self.with_path else (adj, path)
 
@@ -594,7 +581,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
 
         return rc1, rc2
 
-    def _get_all_combinations(self) -> tf.data.Dataset:
+    def _get_all_combinations(self) -> tf.Tensor:
         n = self.num_nodes
         indices = tf.range(n)
 
@@ -612,45 +599,29 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             all_combos = tf.concat([all_combos, aa], axis=0)
         all_combos = all_combos[1:, :]  # remove initial [0, 0] combination
 
-        return tf.data.Dataset.from_tensor_slices(all_combos)
+        return all_combos
 
     def _get_reduced_combinations(
-        self, all_combos: tf.data.Dataset, shuffle: bool = True
-    ) -> tf.data.Dataset:
+        self, all_combos: tf.Tensor, shuffle: bool = True
+    ) -> tf.Tensor:
         """Returns a dataset of node combinations that have equal amounts of
         adjacent and non-adjacent node pairs. The dataset elements are
         in alternating order: adj > not adj > adj > not adj > ..."""
+        adjacencies = [(pair, self._get_adjacency(pair)) for pair in all_combos]
 
         # categorise according to adjacency
-        adj_combos = all_combos.filter(self._is_adj)
-        not_adj_combos = all_combos.filter(self._is_not_adj)
+        adj_combos = [pair for (pair, adj) in adjacencies if adj == 1]
+        not_adj_combos = [pair for (pair, adj) in adjacencies if adj == 0]
 
-        if shuffle:
-            seed = self.seed if self.seed is not None else 12
-            adj_combos = adj_combos.shuffle(
-                self.max_combinations, seed=seed, reshuffle_each_iteration=False
-            )
-            not_adj_combos = not_adj_combos.shuffle(
-                self.max_combinations,
-                seed=seed + 1,
-                reshuffle_each_iteration=False,
-            )
+        if shuffle is True:
+            np.random.shuffle(adj_combos)
+            np.random.shuffle(not_adj_combos)
 
-        # zip cuts off not_adj combinations at the same number of elements as adj
-        reduced_combos = tf.data.Dataset.zip((adj_combos, not_adj_combos)).flat_map(
-            lambda x0, x1: tf.data.Dataset.from_tensors(x0).concatenate(
-                tf.data.Dataset.from_tensors(x1)
-            )
-        )
+        # zip + nested list comprehension = interleaving while cutting off excess non_adj_nodes
+        reduced_combos = [
+            node
+            for adj_and_non_adj in zip(adj_combos, not_adj_combos)
+            for node in adj_and_non_adj
+        ]
 
-        return reduced_combos
-
-    @tf.function
-    def _is_adj(self, pair: tf.Tensor) -> tf.bool:
-        adj = self._get_adjacency(pair)
-        return tf.math.equal(adj, tf.constant(1))
-
-    @tf.function
-    def _is_not_adj(self, pair: tf.Tensor) -> bool:
-        adj = self._get_adjacency(pair)
-        return tf.math.equal(adj, 0)
+        return tf.stack(reduced_combos)
