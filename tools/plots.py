@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import cv2
@@ -55,7 +57,7 @@ def plot_training_sample(
     :param rows: maximum number of data points to plot
     :return:
     """
-    rows = data_generator.batch_size if rows > data_generator.batch_size else rows
+    rows = min(data_generator.batch_size, rows)
 
     if network == NetworkType.NODES_NN:
         plot_fcn = plot_sample_nodes_nn
@@ -185,25 +187,34 @@ def plot_sample_edge_nn(
         plot_img(paths[row], cmap="gray")
         plt.xlabel(f"adj {adjacencies[row]}")
     else:
-        pos_lists = data_generator.get_pos_list(step_num)
-        combos = data_generator.get_combo(step_num).numpy()
         num_imgs = data_generator.images_in_batch
         num_combos = data_generator.node_pairs_image
 
+        # repartition data
+        combos = data_generator.get_combo(step_num).numpy()
+        combos = partition_data(combos, num_imgs)
+        pos_lists = [p.numpy() for p in data_generator.get_pos_list(step_num)]
+        adjacencies = partition_data(adjacencies, num_imgs)
+        paths = partition_data(paths, num_imgs)
+
         for i in range(num_imgs):
-            idx = i * num_imgs
+            idx = i * num_combos
 
-            skel_img = np.float32(combo_img[idx].numpy())[:, :, 0]
+            skel_img = np.float32(combo_img[idx, ..., 0].numpy())
 
-            pos_list = pos_lists[i].numpy()
-            im_combos = combos[idx : idx + num_combos]
-            im_paths = paths[idx : idx + num_combos]
+            pos_list = pos_lists[i]
+            im_combos = combos[i]
+            im_adj = adjacencies[i]
+            im_paths = paths[i]
             pairs_xy = [pos_list[combo] for combo in im_combos]
 
             plot_node_pairs_on_skel(skel_img, pairs_xy, show=True)
             set_plot_title(["path", "path from DataGen"], row, num_rows)
 
-            for ii in range(num_combos):
+            max_rows = min(num_rows, num_combos)
+            for ii in range(max_rows):
+                idx += 1
+
                 # path
                 rc1, rc2 = np.fliplr(pairs_xy[ii])
                 rows = np.sort([rc1[0], rc2[0]])
@@ -216,9 +227,13 @@ def plot_sample_edge_nn(
 
                 plt.subplot(num_rows, num_cols, get_subplot_id(ii, 1, num_cols))
                 plot_img(im_paths[ii], cmap="gray")
-                plt.xlabel(f"adj {adjacencies[row]}")
+                plt.xlabel(f"adj {im_adj[ii]}")
 
             plt.show()
+
+
+def partition_data(data: Union[list, np.ndarray], num_partitions: int) -> List:
+    return np.array_split(data, num_partitions)
 
 
 def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False) -> np.ndarray:
