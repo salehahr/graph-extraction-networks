@@ -49,7 +49,6 @@ class Config(BaseModel):
     save_path: str
 
     validation_fraction: float
-    batch_size: int
     use_small_dataset: bool = False
     max_files: Optional[int] = None
 
@@ -73,6 +72,7 @@ class Config(BaseModel):
 
     run: Optional[RunConfig] = None
     steps_per_epoch: Optional[int] = None
+    batch_size: Optional[int] = None
 
     @validator("max_files")
     def check_max_files(cls, v, values):
@@ -133,11 +133,13 @@ class Config(BaseModel):
 
 
 class RunParams(BaseModel):
+    # general run params
     epochs: int
     learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None
-    node_pairs_in_batch: Optional[int] = None
 
+    # for EdgeNN specifically
+    node_pairs_in_batch: Optional[int] = None
     n_filters: Optional[int] = None
     n_conv2_blocks: Optional[int] = None
     n_conv3_blocks: Optional[int] = None
@@ -189,22 +191,20 @@ class RunConfig(BaseModel):
 
         super(RunConfig, self).__init__(**data)
 
+        self.batch_size = self.parameters.batch_size
+        self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
+
         self.run_name = name if name is not None else self.run_name
 
         if data_config:
+            # connect data_config to run_config
             self.data_config = data_config
             data_config.run = self
+            data_config.batch_size = self.batch_size
 
             self.weights_path = os.path.join(
                 data_config.base_path, f"weights_{self.run_name}.hdf5"
             )
-
-            self.batch_size = (
-                self.parameters.batch_size
-                if self.parameters.batch_size is not None
-                else data_config.batch_size
-            )
-            self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
 
     @property
     def images_in_batch(self) -> int:
