@@ -543,27 +543,13 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def _get_labels(
         self, batch_combo: tf.data.Dataset
     ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
-        def to_path(adjacency: tf.Tensor, pair: tf.Tensor):
-            rc1, rc2 = self._to_coords(pair)
-            row_indices = tf.sort([rc1[0], rc2[0]])
-            col_indices = tf.sort([rc1[1], rc2[1]])
-
-            img_section = self.skel_img[
-                row_indices[0] : row_indices[1] + 1,
-                col_indices[0] : col_indices[1] + 1,
-            ]
-
-            return tf.math.multiply(
-                tf.cast(adjacency, tf.float32),
-                tf.RaggedTensor.from_tensor(img_section),
-            )
 
         adj = batch_combo.map(self._get_adjacency, num_parallel_calls=tf.data.AUTOTUNE)
         path = None
 
         if self.with_path:
             path = tf.data.Dataset.zip((adj, batch_combo)).map(
-                to_path, num_parallel_calls=tf.data.AUTOTUNE
+                self._to_path, num_parallel_calls=tf.data.AUTOTUNE
             )
             path = rebatch(path, self.batch_size)
 
@@ -576,6 +562,23 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         n1, n2 = pair[0], pair[1]
         return self.adj_matr[n1, n2]
 
+    @tf.function
+    def _to_path(self, adjacency: tf.Tensor, pair: tf.Tensor):
+        rc1, rc2 = self._to_coords(pair)
+        row_indices = tf.sort([rc1[0], rc2[0]])
+        col_indices = tf.sort([rc1[1], rc2[1]])
+
+        img_section = self.skel_img[
+            row_indices[0] : row_indices[1] + 1,
+            col_indices[0] : col_indices[1] + 1,
+        ]
+
+        return tf.math.multiply(
+            tf.cast(adjacency, tf.float32),
+            tf.RaggedTensor.from_tensor(img_section),
+        )
+
+    @tf.function
     def _to_coords(self, pair: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         xy1 = self.pos_list[pair[0], :]
         xy2 = self.pos_list[pair[1], :]
@@ -601,7 +604,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             # goes from 0 to n - 2
             aa = z[x + 1 :, x, :]
             all_combos = tf.concat([all_combos, aa], axis=0)
-        all_combos = all_combos[1:, :]
+        all_combos = all_combos[1:, :]  # remove initial [0, 0] combination
 
         return tf.data.Dataset.from_tensor_slices(all_combos)
 
