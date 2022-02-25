@@ -4,9 +4,6 @@ from tools import TestType, get_eedg, get_gedg, run
 
 # user input
 run_name = "edge_nn"
-do_resume = False  # "must"
-do_reinit = False if not do_resume else True
-
 max_num_images = 50
 
 if __name__ == "__main__":
@@ -18,7 +15,7 @@ if __name__ == "__main__":
     edge_data = get_eedg(data_config, run_config, graph_data)
 
     # init new run
-    run.start(run_config, resume=do_resume, reinit=do_reinit, _id=run_config.run_id)
+    run.start(run_config)
 
     # init model/reload model on resumed run
     edge_nn = run.load_model(data_config, run_config)

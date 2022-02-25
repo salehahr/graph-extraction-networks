@@ -3,7 +3,7 @@ import shutil
 import unittest
 
 from model import VGG16
-from tools import Config, RunConfig, TestType, get_eedg, get_gedg, run
+from tools import TestType, get_eedg, get_gedg, run
 
 
 class TestEdgeNN(unittest.TestCase):
@@ -11,11 +11,9 @@ class TestEdgeNN(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.config = Config("test_config.yaml")
-        cls.run_config = RunConfig(
-            "test_wandb_config_edge.yaml", data_config=cls.config
-        )
-        cls.network = cls.config.network.edge_extraction
+        data_config_fp = "test_config.yaml"
+        run_config_fp = "test_wandb_config_edge.yaml"
+        cls.config, cls.run_config = run.get_configs(data_config_fp, run_config_fp)
 
         num_filters = 4
         cls.weights = os.path.join(cls.config.base_path, "weights_edge_nn.hdf5")

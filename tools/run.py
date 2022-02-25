@@ -20,28 +20,14 @@ if TYPE_CHECKING:
     from tools import EdgeDGSingle
 
 
-def get_configs(config_fp: str, run_name: str) -> Tuple[Config, RunConfig]:
+def get_configs(config_fp: str, run_config_fp: str) -> Tuple[Config, RunConfig]:
     data_config = Config(config_fp)
-    run_config_fp = os.path.join(data_config.base_path, f"configs/{run_name}.yaml")
-    run_config = RunConfig(run_config_fp, run_name, data_config=data_config)
+    run_config = RunConfig(run_config_fp, data_config=data_config)
     return data_config, run_config
-
-
-def check_weights(run_config: RunConfig) -> None:
-    # moot because the way the model is saved has changed
-    weights_exist = os.path.isfile(run_config.weights_path)
-
-    if not run_config.resume:
-        assert weights_exist is False
-    # else:
-    #     assert weights_exist is True
 
 
 def start(
     run_config: RunConfig,
-    resume: Union[bool, str] = False,
-    reinit: bool = False,
-    _id: Optional[str] = None,
     run_name: Optional[str] = None,
     is_sweep: bool = False,
 ) -> wandb.run:
@@ -50,6 +36,9 @@ def start(
     if not run_name and not is_sweep:
         run_name = run_config.run_name
 
+    resume = "must" if run_config.resume is True else run_config.resume
+    reinit = True if run_config.resume is True else run_config.resume
+
     run_ = wandb.init(
         project=run_config.project,
         entity=run_config.entity,
@@ -57,7 +46,7 @@ def start(
         config=run_params,
         resume=resume,
         reinit=reinit,
-        id=_id,
+        id=run_config.run_id,
     )
     return run_
 
@@ -96,8 +85,11 @@ def load_model(
 
     # load weights on resumed run
     if wandb.run.resumed:
-        h5_model = wandb.restore(run_config.model_filename)
-        model_.load_weights(h5_model.name)
+        best_model = wandb.restore(
+            "model-best.h5",
+            run_path=f"{run_config.entity}/{run_config.project}/{run_config.run_id}",
+        )
+        model_.load_weights(best_model.name)
         model_.recompile()
 
     return model_
@@ -123,7 +115,7 @@ def train(
         x=data[test_type],
         validation_data=validation_data,
         initial_epoch=wandb.run.step,
-        epochs=epochs + wandb.run.step,
+        epochs=epochs,
         steps_per_epoch=num_steps,
         validation_steps=num_steps,
         callbacks=[WandbCallback(save_weights_only=True)],
