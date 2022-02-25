@@ -4,13 +4,14 @@ import numpy as np
 
 from tools import (
     Config,
-    EdgeDGMultiple,
     EdgeDGSingle,
     GraphExtractionDG,
     NodeExtractionDG,
     RunConfig,
     TestType,
+    get_eedg,
     get_gedg,
+    run,
 )
 from tools.data import ds_to_list
 from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
@@ -20,6 +21,15 @@ def cycle_through_items(dataset):
     # one complete epoch: passes through all the data in the dataset
     for i in range(len(dataset)):
         assert dataset[i] is not None
+
+
+def check_alternating(adjacencies: np.ndarray):
+    for i, adj in enumerate(adjacencies.squeeze()):
+        is_odd = i % 2 == 1
+        if is_odd:
+            assert adj == 0
+        else:
+            assert adj == 1
 
 
 class TestNodeExtractionDG(unittest.TestCase):
@@ -178,7 +188,7 @@ class TestEdgeDGSingle(unittest.TestCase):
 
         adjacency = adjacency.numpy()
         self.assertEqual(adjacency.shape, (self.training_data.batch_size, 1))
-        self._check_alternating(adjacency)
+        check_alternating(adjacency)
 
         path = [p[0] for p in path.numpy()]
         self.assertEqual(adjacency.shape[0], self.training_data.batch_size)
@@ -190,15 +200,6 @@ class TestEdgeDGSingle(unittest.TestCase):
             is_normalised = np.max(p) <= 1
             self.assertTrue(is_normalised)
             self.assertEqual(np.max(p), a)
-
-    @staticmethod
-    def _check_alternating(adjacencies):
-        for i, adj in enumerate(adjacencies.squeeze()):
-            is_odd = i % 2 == 1
-            if is_odd:
-                assert adj == 0
-            else:
-                assert adj == 1
 
     def test_all_combinations(self):
         combos = self.training_data._get_all_combinations().as_numpy_iterator()
@@ -246,23 +247,22 @@ class TestEdgeDGSingle(unittest.TestCase):
 class TestEdgeDGMultiple(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.config = Config("test_config.yaml")
-        cls.run_config = RunConfig(
-            "test_wandb_config_edge.yaml", data_config=cls.config
-        )
+        ds_config_fp = "test_config.yaml"
+        run_config_fp = "test_wandb_config_edge.yaml"
+        cls.config, cls.run_config = run.get_configs(ds_config_fp, run_config_fp)
         cls.network = cls.config.network.edge_extraction
 
-        test_type = TestType.TRAINING
-        gedg = get_gedg(cls.config)
-        cls.training_data = EdgeDGMultiple(
-            cls.config,
-            cls.run_config,
-            gedg[test_type],
-            with_path=True,
-        )
+        eedg = get_eedg(cls.config, cls.run_config, with_path=True)
+        cls.training_data = eedg[TestType.TRAINING]
+        cls.validation_data = eedg[TestType.VALIDATION]
 
-    def test_get_data(self):
-        self.assertIsNotNone(self.training_data[0])
+    def test_training_generator(self):
+        self.assertEqual(len(self.training_data), 8)
+        cycle_through_items(self.training_data)
+
+    def test_validation_generator(self):
+        self.assertEqual(len(self.validation_data), 2)
+        cycle_through_items(self.validation_data)
 
     def test_plot_training_sample(self):
         step_num = 0
@@ -271,7 +271,51 @@ class TestEdgeDGMultiple(unittest.TestCase):
             step_num=step_num,
             network=self.network.id,
             multiple=True,
+            rows=self.training_data.node_pairs_image,
         )
+
+    def test_input_data(self):
+        step_num = 0
+        id_in_batch = 0
+
+        x, _ = self.validation_data[step_num]
+        self.assertEqual(x.shape, (12, 256, 256, 2))
+
+        combo_img = x[id_in_batch].numpy()
+        is_normalised = np.max(combo_img) <= 1
+        self.assertTrue(is_normalised)
+        self.assertEqual(combo_img.shape, (256, 256, 2))
+        self.assertEqual(combo_img.dtype, np.int64)
+
+        # visual test
+        skel_part = combo_img[..., 0]
+        node_pair = combo_img[..., 1]
+        plot_bgr_img(skel_part, "test_input_data: skel_part", show=True)
+        plot_bgr_img(node_pair, "test_input_data: node_pair", show=True)
+
+        # make sure only one node pair is in the image
+        pair_rc = np.argwhere(node_pair)
+        self.assertEqual(pair_rc.shape, (2, 2))
+
+    def test_output_data(self):
+        step_num = 0
+
+        _, (adjacencies, paths) = self.training_data[step_num]
+
+        adjacencies = adjacencies.numpy()
+        self.assertEqual(adjacencies.shape, (12, 1))
+        check_alternating(adjacencies)
+
+        paths = [p[0] for p in paths.numpy()]
+        self.assertEqual(len(paths), 12)
+
+        for a, p in zip(adjacencies, paths):
+            self.assertEqual(a.dtype, np.int32)
+            self.assertTrue(a in [0, 1])
+
+            is_normalised = np.max(p) <= 1
+            self.assertTrue(is_normalised)
+            self.assertEqual(np.max(p), a)
 
 
 class TestDataset(unittest.TestCase):

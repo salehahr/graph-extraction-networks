@@ -14,7 +14,7 @@ model_filename: model.h5
 
 parameters:
   batch_size: 3
-  node_pairs_in_batch: 3
+  node_pairs_in_batch: 4
   epochs: 2
   optimizer: adam
 
