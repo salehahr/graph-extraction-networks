@@ -13,7 +13,7 @@ from tools.data import pos_list_from_image
 from tools.image import classifier_preview, colour_enums, draw_circles, get_rgb
 from tools.NetworkType import NetworkType
 from tools.node_classifiers import NodeDegrees
-from tools.postprocessing import classify, eedg_coordinates, eedg_predict
+from tools.postprocessing import classify
 
 if TYPE_CHECKING:
     from tools import EdgeDGMultiple, EdgeDGSingle
@@ -408,17 +408,3 @@ def show_predictions(
         plt.savefig(filepath)
 
     plt.show()
-
-
-def show_edge_predictions(
-    model: tf.keras.models.Model,
-    data_generator,
-    step_num: int = 0,
-):
-    y_true, y_pred = eedg_predict(data_generator, model, step_num)
-    pairs_xy = eedg_coordinates(data_generator, step_num)
-    plot_node_pairs_on_skel(data_generator.skel_img, pairs_xy, show=True)
-
-    for id, (pred, true) in enumerate(zip(y_pred, y_true)):
-        text = f"{id+1:3d}: Pred {pred[0]:d} / True {true.numpy()[0]:d}"
-        print(text)

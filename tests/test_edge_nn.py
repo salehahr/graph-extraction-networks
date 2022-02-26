@@ -14,6 +14,7 @@ class TestEdgeNN(unittest.TestCase):
         data_config_fp = "test_config.yaml"
         run_config_fp = "test_wandb_config_edge.yaml"
         cls.config, cls.run_config = run.get_configs(data_config_fp, run_config_fp)
+        cls.network = cls.config.network.edge_extraction
 
         num_filters = 4
         cls.weights = os.path.join(cls.config.base_path, "weights_edge_nn.hdf5")
@@ -22,13 +23,6 @@ class TestEdgeNN(unittest.TestCase):
 
         cls.graph_data = get_gedg(cls.config)
         cls.edge_data = get_eedg(cls.config, cls.run_config, cls.graph_data)
-
-    def setUp(self) -> None:
-        directories = [self.config.checkpoint_dir]
-        for d in directories:
-            if os.path.isdir(d):
-                shutil.rmtree(d)
-            os.makedirs(d)
 
     @classmethod
     def _init_model(cls, num_filters: int) -> VGG16:
@@ -40,10 +34,24 @@ class TestEdgeNN(unittest.TestCase):
         edge_nn.build()
         return edge_nn
 
-    def test_train(self) -> None:
+    def setUp(self) -> None:
+        directories = [self.config.checkpoint_dir]
+        for d in directories:
+            if os.path.isdir(d):
+                shutil.rmtree(d)
+            os.makedirs(d)
         run.start(self.run_config)
 
-        run.train(self.model, self.edge_data, debug=True)
-        run.predict(self.model, self.edge_data[TestType.VALIDATION], max_pred=5)
+    def test_train(self) -> None:
+        short_training_run = False
+        run.train(
+            self.model, self.edge_data, debug=short_training_run, predict_frequency=2
+        )
 
+    def test_predict(self) -> None:
+        run.predict(
+            self.model, self.edge_data[TestType.VALIDATION], max_pred=5, show=True
+        )
+
+    def tearDown(self) -> None:
         run.end()

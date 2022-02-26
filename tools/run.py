@@ -2,22 +2,24 @@ from __future__ import annotations
 
 import math
 import os
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
 
+import numpy as np
 import wandb
+from keras.callbacks import Callback
 from wandb.integration.keras import WandbCallback
 
 from model import VGG16
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
-from tools.postprocessing import eedg_predict
+from tools.postprocessing import classify
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
     import tensorflow as tf
 
     from model import UNet
-    from tools import EdgeDGSingle
+    from tools import EdgeDGMultiple
 
 
 def get_configs(config_fp: str, run_config_fp: str) -> Tuple[Config, RunConfig]:
@@ -29,6 +31,7 @@ def get_configs(config_fp: str, run_config_fp: str) -> Tuple[Config, RunConfig]:
 def start(
     run_config: RunConfig,
     run_name: Optional[str] = None,
+    run_id: Optional[str] = None,
     is_sweep: bool = False,
 ) -> wandb.run:
     run_params = None if is_sweep else run_config.parameters
@@ -38,6 +41,7 @@ def start(
 
     resume = "must" if run_config.resume is True else run_config.resume
     reinit = True if run_config.resume is True else run_config.resume
+    id_ = run_id if run_id is not None else run_config.run_id
 
     run_ = wandb.init(
         project=run_config.project,
@@ -46,7 +50,7 @@ def start(
         config=run_params,
         resume=resume,
         reinit=reinit,
-        id=run_config.run_id,
+        id=id_,
     )
     return run_
 
@@ -97,10 +101,12 @@ def load_model(
 
 def train(
     model_: Union[VGG16, UNet],
-    data: Dict[TestType, Any],
+    data: Dict[TestType, EdgeDGMultiple],
     epochs: Optional[int] = None,
+    max_num_images: Optional[int] = None,
     steps_in_epoch: Optional[int] = None,
     test_type: TestType = TestType.TRAINING,
+    predict_frequency: int = 10,
     debug: bool = False,
 ) -> tf.keras.callbacks.History:
     epochs = wandb.config.epochs if epochs is None else epochs
@@ -109,7 +115,15 @@ def train(
         data[TestType.VALIDATION] if test_type is TestType.TRAINING else None
     )
 
-    num_steps = 3 if debug is True else steps_in_epoch
+    if debug is True:
+        num_steps = 3
+    else:
+        num_steps = steps_in_epoch
+
+        if max_num_images is not None:
+            num_steps = math.ceil(
+                max_num_images / data[TestType.TRAINING].images_in_batch
+            )
 
     history = model_.fit(
         x=data[test_type],
@@ -118,7 +132,10 @@ def train(
         epochs=epochs,
         steps_per_epoch=num_steps,
         validation_steps=num_steps,
-        callbacks=[WandbCallback(save_weights_only=True)],
+        callbacks=[
+            WandbCallback(save_weights_only=True),
+            PredictionCallback(predict_frequency, validation_data),
+        ],
     )
 
     return history
@@ -136,43 +153,46 @@ def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
 
 def predict(
     model_: VGG16,
-    val_data: EdgeDGSingle,
+    val_data: EdgeDGMultiple,
     max_pred: int = 5,
-    only_adj_nodes: bool = True,
+    only_adj_nodes: bool = False,
+    show: bool = False,
+    description: Optional[str] = None,
 ):
-    prediction = wandb.Artifact(f"run_{wandb.run.id}", type="predictions")
+    prediction = wandb.Artifact(
+        f"run_{wandb.run.id}", type="predictions", description=description
+    )
     table = wandb.Table(columns=["adj_pred", "adj_true", "image"])
 
+    num_imgs = val_data.images_in_batch
+    num_combos = val_data.node_pairs_image
+
     step_num = 0
+    id_in_batch = 0
     max_steps = math.ceil(max_pred / val_data.node_pairs_batch)
 
-    for i in range(max_steps):
+    for step in range(max_steps):
         if only_adj_nodes:
             # Only show predictions for adjacent nodes
-            step_num = choose_step_num(val_data, step_num=step_num, pick_adj=True)
+            step_num, id_in_batch = choose_step_num(
+                val_data, step_num=step_num, id_in_batch=id_in_batch, pick_adj=True
+            )
         else:
-            step_num = i
+            step_num = step
 
-        adj_true, adj_pred = eedg_predict(val_data, model_, step_num)
+        combo_img, adj_true = val_data[step_num]
+        adj_pred, _ = classify(model_.predict(combo_img))
 
-        num_images = val_data.batch_size
-        num_combos = val_data.node_pairs_image
+        for i in range(num_imgs):
+            idx = i * num_combos
 
-        combo_img, _ = val_data[step_num]
-        pos_lists = [p.numpy() for p in val_data.get_pos_list(step_num)]
-        combos = val_data.get_combo(step_num).numpy()
+            skel_img = np.float32(combo_img[idx, ..., 0].numpy())
 
-        for ii in range(num_images):
-            idx = ii * num_images
+            for ii in range(num_combos):
+                node_pair_img = np.float32(combo_img[idx, ..., 1].numpy())
+                pair_xy = [p for p in np.fliplr(np.argwhere(node_pair_img))]
 
-            im_combos = combos[idx : idx + num_combos]
-            pos_list = pos_lists[ii]
-
-            skel_img = combo_img[idx].numpy()[:, :, 0]
-            pairs_xy = pos_list[im_combos]
-
-            for iii in range(num_combos):
-                rgb_img = plot_node_pairs_on_skel(skel_img, [pairs_xy[iii]], show=True)
+                rgb_img = plot_node_pairs_on_skel(skel_img, [pair_xy], show=show)
                 table.add_data(
                     int(adj_pred[idx]), int(adj_true[idx]), wandb.Image(rgb_img)
                 )
@@ -184,7 +204,9 @@ def predict(
             if idx >= max_pred:
                 break
 
-        step_num += 1
+        step_num, id_in_batch = increment_step(
+            step_num, id_in_batch, val_data.effective_batch_size
+        )
 
     prediction.add(table, "predictions")
 
@@ -192,22 +214,62 @@ def predict(
 
 
 def choose_step_num(
-    val_data: EdgeDGSingle, step_num: int = 0, pick_adj: bool = True
-) -> int:
+    val_data: EdgeDGMultiple,
+    step_num: int = 0,
+    id_in_batch: int = 0,
+    pick_adj: bool = True,
+) -> Tuple[int, int]:
     """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
     found = False
 
     while found is False:
         _, adjacencies = val_data[step_num]
-        found = (1 in adjacencies) if pick_adj is True else (0 in adjacencies)
+        adj = adjacencies[id_in_batch]
+        found = adj.numpy().squeeze() == 1 if pick_adj is True else (0 in adjacencies)
 
         if found:
             break
-        else:
-            step_num += 1
 
-    return step_num
+        step_num, id_in_batch = increment_step(
+            step_num, id_in_batch, val_data.effective_batch_size
+        )
+
+    return step_num, id_in_batch
+
+
+def increment_step(step_num: int, id_in_batch: int, batch_size: int) -> Tuple[int, int]:
+    if id_in_batch >= (batch_size - 1):
+        step_num += 1
+        id_in_batch = 0
+    else:
+        id_in_batch += 1
+
+    return step_num, id_in_batch
 
 
 def end() -> None:
     wandb.finish()
+
+
+class PredictionCallback(Callback):
+    def __init__(
+        self,
+        frequency: int,
+        validation_data: EdgeDGMultiple,
+        total_epochs: Optional[int] = None,
+    ):
+        super().__init__()
+
+        self.frequency = frequency
+        self.validation_data = validation_data
+        self.total_epochs = (
+            total_epochs if total_epochs is not None else wandb.config.epochs
+        )
+
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch % self.frequency == 0:
+            predict(
+                self.model,
+                self.validation_data,
+                description=f"Prediction on epoch {epoch}/{self.total_epochs}.",
+            )
