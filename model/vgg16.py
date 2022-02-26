@@ -18,10 +18,13 @@ class VGG16(Model):
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
         pretrained_weights=None,
+        learning_rate: float = 0.01,
     ):
         self.n_filters = n_filters
         self.n_conv2_blocks = n_conv2_blocks
         self.n_conv3_blocks = n_conv3_blocks
+
+        self.learning_rate = learning_rate
 
         x = input_tensor(input_size)
         out = self._conv2_blocks(x)
@@ -71,13 +74,16 @@ class VGG16(Model):
         return x
 
     def build(self, **kwargs):
-        self.compile(
-            optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"], **kwargs
-        )
+        self.recompile(**kwargs)
         self.summary()
 
-    def recompile(self):
-        self.compile(optimizer=Adam(), loss="binary_crossentropy", metrics=["accuracy"])
+    def recompile(self, **kwargs):
+        self.compile(
+            optimizer=Adam(learning_rate=self.learning_rate),
+            loss="binary_crossentropy",
+            metrics=["accuracy"],
+            **kwargs,
+        )
 
     @staticmethod
     def checkpoint(filepath, save_frequency="epoch"):

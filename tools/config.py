@@ -134,6 +134,7 @@ class Config(BaseModel):
 
 class RunParams(BaseModel):
     epochs: int
+    learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None
     node_pairs_in_batch: Optional[int] = None
 

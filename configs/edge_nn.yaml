@@ -3,7 +3,7 @@ entity: salehah
 
 
 # run details
-run_name: edge_nn
+run_name: 8f
 resume: false
 run_id: null
 run_type: training
@@ -13,12 +13,13 @@ model_filename: model.h5
 
 
 parameters:
+  epochs: 50
+  learning_rate: 1e-5
   batch_size: 4
   node_pairs_in_batch: 8
-  n_filters: 16
+  n_filters: 8
   n_conv2_blocks: 2
   n_conv3_blocks: 3
-  epochs: 100
 
 
 sweep_config: null
