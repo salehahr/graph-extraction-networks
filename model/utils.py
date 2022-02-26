@@ -31,13 +31,19 @@ def input_tensor(input_size: Tuple[int, int, int]) -> Input:
 
 # function that defines one convolutional layer with certain number of filters
 def single_conv(
-    input_tensor, n_filters: int, kernel_size: int, name: str, activation: str
+    input_tensor,
+    n_filters: int,
+    kernel_size: int,
+    name: str,
+    activation: str,
+    padding: bool,
 ):
     return Conv2D(
         name=name,
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
         activation=activation,
+        padding="same" if padding is True else None,
     )(input_tensor)
 
 

@@ -47,10 +47,10 @@ class VGG16(Model):
             x = double_conv(
                 x,
                 self.n_filters * 2 ** (i - 1),
-                f"relu_block{i}",
-                normalise=False,
+                f"relu_C2_block{i}",
+                normalise=True,
             )
-            x = pooling(x)
+            x = pooling(x, dropout_rate=0)
 
         return x
 
@@ -59,17 +59,16 @@ class VGG16(Model):
         final_block_num = self.n_conv2_blocks + self.n_conv3_blocks
 
         for i in range(self.n_conv2_blocks + 1, final_block_num + 1):
-            x = double_conv(
-                x, self.n_filters * 2 ** (i - 1), name=None, normalise=False
-            )
+            x = double_conv(x, self.n_filters * 2 ** (i - 1), name=None, normalise=True)
             x = single_conv(
                 x,
                 self.n_filters * 2 ** (i - 1),
                 kernel_size=3,
                 activation="relu",
-                name=f"relu_block{i}",
+                name=f"relu_C3_block{i}",
+                padding=True,
             )
-            x = pooling(x)
+            x = pooling(x, dropout_rate=0)
 
         return x
 
