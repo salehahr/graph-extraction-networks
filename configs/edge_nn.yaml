@@ -4,8 +4,8 @@ entity: salehah
 
 # run details
 run_name: 8f
-resume: false
-run_id: null
+resume: true
+run_id: z3d6w4f2
 run_type: training
 
 
