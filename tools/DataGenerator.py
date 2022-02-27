@@ -490,23 +490,31 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
 
     @property
     def images_in_batch(self) -> int:
-        return len(self)
+        return 1
 
     @property
     def node_pairs_image(self) -> int:
         return self.batch_size
 
+    @property
+    def total_combos(self):
+        return len(self.combos)
+
     def on_epoch_end(self):
         self.combos = self._get_reduced_combinations(self.combos, shuffle=True)
 
     def __len__(self) -> int:
-        return 1
+        return int(np.floor(self.total_combos / self.batch_size))
 
     def __getitem__(
         self, i: int
     ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
+        # allow overflow
+        is_overflow = i >= len(self)
+        idx = max(i, len(self)) % min(i, len(self)) if is_overflow else i
+
         batch_combo = self.combos[
-            i * self.batch_size : i * self.batch_size + self.batch_size
+            idx * self.batch_size : idx * self.batch_size + self.batch_size
         ]
 
         x = self._get_combo_img(batch_combo)
