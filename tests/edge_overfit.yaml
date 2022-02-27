@@ -1,0 +1,31 @@
+project: my-test-project
+entity: salehah
+
+
+# run details
+run_name: overfit
+resume: false
+run_id: null
+run_type: training
+
+
+model_filename: model.h5
+
+
+parameters:
+  epochs: 10
+  batch_size: 1
+  node_pairs_in_batch: 2
+  n_filters: 16
+  optimizer: adam
+
+
+sweep_config:
+  name: optimiser
+  method: random
+  metric:
+    name: accuracy
+    goal: maximize
+  parameters:
+    optimizer:
+      values: ["adam", "nadam", "sgd"]

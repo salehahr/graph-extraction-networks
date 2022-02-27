@@ -46,7 +46,7 @@ class TestEdgeNN(unittest.TestCase):
 
     def test_train(self) -> None:
         run.start(self.run_config)
-        short_training_run = True
+        short_training_run = False
         run.train(
             self.model, self.edge_data, debug=short_training_run, predict_frequency=2
         )
@@ -56,5 +56,22 @@ class TestEdgeNN(unittest.TestCase):
         run.start(self.run_config)
         run.predict(
             self.model, self.edge_data[TestType.VALIDATION], max_pred=5, show=True
+        )
+        run.end()
+
+    def test_overfit(self) -> None:
+        """Sanity check: model trained on only a small amount of data SHUOLD overfit."""
+        data_config_fp = "small_ds.yaml"
+        run_config_fp = "edge_overfit.yaml"
+        validate = True
+        debug = False
+
+        config, run_config = run.get_configs(data_config_fp, run_config_fp)
+
+        edge_data = get_eedg(config, run_config, validate=validate)
+
+        run.start(run_config)
+        run.train(
+            self.model, edge_data, validate=validate, debug=debug, predict_frequency=2
         )
         run.end()
