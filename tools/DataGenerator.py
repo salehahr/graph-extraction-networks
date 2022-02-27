@@ -511,7 +511,11 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
         # allow overflow
         is_overflow = i >= len(self)
-        idx = max(i, len(self)) % min(i, len(self)) if is_overflow else i
+
+        if i > 0 and is_overflow:
+            idx = max(i, len(self)) % min(i, len(self))
+        else:
+            idx = i
 
         batch_combo = self.combos[
             idx * self.batch_size : idx * self.batch_size + self.batch_size
