@@ -68,16 +68,12 @@ def plot_training_sample(
     else:
         raise Exception
 
-    multiple_imgs = False
-    if "multiple" in kwargs.keys() and kwargs["multiple"] is True:
-        multiple_imgs = True
-
-    if not multiple_imgs:
+    if network == NetworkType.EDGE_NN:
+        plot_fcn(data_generator, step_num, 0, rows, **kwargs)
+    else:
         for row in range(rows):
             plt.figure(0)
             plot_fcn(data_generator, step_num, row, rows, **kwargs)
-    else:
-        plot_fcn(data_generator, step_num, 0, rows, **kwargs)
 
     plt.show()
 
@@ -153,12 +149,7 @@ def plot_sample_edge_nn(
     step_num: int,
     row: int,
     num_rows: int,
-    **kwargs,
 ):
-    multiple_imgs = False
-    if "multiple" in kwargs.keys() and kwargs["multiple"] is True:
-        multiple_imgs = True
-
     num_cols = 2
 
     assert data_generator.with_path is True
@@ -166,70 +157,45 @@ def plot_sample_edge_nn(
     adjacencies = adjacencies.numpy().squeeze()
     paths = [p.numpy() for p in paths]
 
-    if not multiple_imgs:
+    num_imgs = data_generator.images_in_batch
+    num_combos = data_generator.node_pairs_image
+
+    # repartition data
+    adjacencies = partition_data(adjacencies, num_imgs)
+    paths = partition_data(paths, num_imgs)
+
+    for i in range(num_imgs):
+        idx = i * num_combos
+
+        skel_img = np.float32(combo_img[idx, ..., 0].numpy())
+        node_pair_imgs = np.float32(combo_img[idx : idx + num_combos, ..., 1].numpy())
+
+        im_adj = adjacencies[i]
+        im_paths = paths[i]
+        pairs_xy = [np.fliplr(np.argwhere(np_im)) for np_im in node_pair_imgs]
+
+        plot_node_pairs_on_skel(skel_img, pairs_xy, show=True)
         set_plot_title(["path", "path from DataGen"], row, num_rows)
-        pos_list = data_generator.pos_list.numpy()
-        combos = kwargs["combos"]
 
-        skel_img = np.float32(combo_img[row].numpy())
+        max_rows = min(num_rows, num_combos)
+        for ii in range(max_rows):
+            idx += 1
 
-        # path
-        rc1, rc2 = np.fliplr(pos_list[combos[row]])
-        rows = np.sort([rc1[0], rc2[0]])
-        cols = np.sort([rc1[1], rc2[1]])
+            # path
+            rc1, rc2 = np.fliplr(pairs_xy[ii])
+            rows = np.sort([rc1[0], rc2[0]])
+            cols = np.sort([rc1[1], rc2[1]])
 
-        img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1, 0]
-        plt.subplot(num_rows, num_cols, get_subplot_id(row, 0, num_cols))
-        plot_img(img_section, cmap="gray")
-        plt.xlabel(f"RC {rc1} - {rc2}")
+            img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1]
+            plt.subplot(num_rows, num_cols, get_subplot_id(ii, 0, num_cols))
+            plot_img(img_section, cmap="gray")
+            plt.xlabel(f"RC {rc1} - {rc2}")
 
-        plt.subplot(num_rows, num_cols, get_subplot_id(row, 1, num_cols))
-        plot_img(paths[row], cmap="gray")
-        plt.xlabel(f"adj {adjacencies[row]}")
-    else:
-        num_imgs = data_generator.images_in_batch
-        num_combos = data_generator.node_pairs_image
+            plt.subplot(num_rows, num_cols, get_subplot_id(ii, 1, num_cols))
+            plot_img(im_paths[ii], cmap="gray")
+            plt.xlabel(f"adj {im_adj[ii]}")
 
-        # repartition data
-        combos = data_generator.get_combo(step_num).numpy()
-        combos = partition_data(combos, num_imgs)
-        pos_lists = [p.numpy() for p in data_generator.get_pos_list(step_num)]
-        adjacencies = partition_data(adjacencies, num_imgs)
-        paths = partition_data(paths, num_imgs)
-
-        for i in range(num_imgs):
-            idx = i * num_combos
-
-            skel_img = np.float32(combo_img[idx, ..., 0].numpy())
-
-            pos_list = pos_lists[i]
-            im_combos = combos[i]
-            im_adj = adjacencies[i]
-            im_paths = paths[i]
-            pairs_xy = [pos_list[combo] for combo in im_combos]
-
-            plot_node_pairs_on_skel(skel_img, pairs_xy, show=True)
-            set_plot_title(["path", "path from DataGen"], row, num_rows)
-
-            max_rows = min(num_rows, num_combos)
-            for ii in range(max_rows):
-                idx += 1
-
-                # path
-                rc1, rc2 = np.fliplr(pairs_xy[ii])
-                rows = np.sort([rc1[0], rc2[0]])
-                cols = np.sort([rc1[1], rc2[1]])
-
-                img_section = skel_img[rows[0] : rows[1] + 1, cols[0] : cols[1] + 1]
-                plt.subplot(num_rows, num_cols, get_subplot_id(ii, 0, num_cols))
-                plot_img(img_section, cmap="gray")
-                plt.xlabel(f"RC {rc1} - {rc2}")
-
-                plt.subplot(num_rows, num_cols, get_subplot_id(ii, 1, num_cols))
-                plot_img(im_paths[ii], cmap="gray")
-                plt.xlabel(f"adj {im_adj[ii]}")
-
-            plt.show()
+        plt.show()
 
 
 def partition_data(data: Union[list, np.ndarray], num_partitions: int) -> List:

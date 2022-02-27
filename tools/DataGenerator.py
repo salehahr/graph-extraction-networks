@@ -339,10 +339,6 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
         self.node_pairs_image: int = run_config.node_pairs_in_image
         self.node_pairs_batch: int = self.images_in_batch * self.node_pairs_image
 
-        # derived data across all batches
-        self.combos: List[Optional[tf.Tensor]] = [None] * self.num_batches
-        self.pos_list: List[Optional[List[tf.Tensor]]] = [None] * self.num_batches
-
         # shuffle
         self.on_epoch_end()
 
@@ -371,8 +367,6 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
 
         # placeholders for data across images in gedg batch
         num_images = skel_imgs.shape[0]
-        pos_list = [None] * num_images
-        combos = [None] * num_images
         combo_imgs = [None] * num_images
         adjacencies = [None] * num_images
         paths = [None] * num_images
@@ -396,18 +390,11 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
 
             x, y = eedg_single[0]
 
-            pos_list[ii] = eedg_single.pos_list
-            combos[ii] = eedg_single.get_combo(0)
             combo_imgs[ii] = x
-
             if self.with_path:
                 adjacencies[ii], paths[ii] = y
             else:
                 adjacencies[ii] = y
-
-        # fill lists of derived data at current batch number
-        self.pos_list[i] = pos_list
-        self.combos[i] = tf.concat(combos, axis=0)
 
         # actual outputs of the data generator
         """
@@ -500,6 +487,14 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
 
         # shuffle
         self.on_epoch_end()
+
+    @property
+    def images_in_batch(self) -> int:
+        return len(self)
+
+    @property
+    def node_pairs_image(self) -> int:
+        return self.batch_size
 
     def on_epoch_end(self):
         self.combos = self._get_reduced_combinations(self.combos, shuffle=True)
