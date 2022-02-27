@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -90,12 +91,22 @@ def load_model(
 
     # load weights on resumed run
     if wandb.run.resumed:
-        best_model = wandb.restore(
-            "model-best.h5",
-            run_path=f"{run_config.entity}/{run_config.project}/{run_config.run_id}",
-        )
-        model_.load_weights(best_model.name)
-        model_.recompile()
+        try:
+            best_model = wandb.restore(
+                "model-best.h5",
+                run_path=f"{run_config.entity}/{run_config.project}/{run_config.run_id}",
+            )
+            model_.load_weights(best_model.name)
+            model_.recompile()
+        except ValueError as ve:
+            print(ve)
+            print(
+                "Warning: model not found on resumed run -- using a newly initialised model."
+            )
+        except Exception as e:
+            print(e)
+            print("Load model failed.")
+            sys.exit(1)
 
     return model_
 
