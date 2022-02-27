@@ -14,7 +14,7 @@ from tools import (
     run,
 )
 from tools.data import ds_to_list
-from tools.plots import plot_bgr_img, plot_node_pairs_on_skel, plot_training_sample
+from tools.plots import plot_bgr_img, plot_training_sample
 
 
 def cycle_through_items(dataset):
@@ -154,13 +154,11 @@ class TestEdgeDGSingle(unittest.TestCase):
         cls.run_config = RunConfig(
             "test_wandb_config_edge.yaml", data_config=cls.config
         )
-
-        cls.config.batch_size = 1
         cls.network = cls.config.network.edge_extraction
 
-        graph_data = get_gedg(cls.config, batch_size=1)[TestType.TRAINING]
         step_num = 0
-        x, y = graph_data[step_num]
+        cls.graph_data = get_gedg(cls.config, batch_size=1)[TestType.TRAINING]
+        x, y = cls.graph_data[step_num]
 
         cls.training_data = EdgeDGSingle(
             cls.config,
@@ -173,13 +171,26 @@ class TestEdgeDGSingle(unittest.TestCase):
 
     def test_input_data(self):
         step_num = 0
-        img, _ = self.training_data[step_num]
+        id_in_batch = 0
+        combo_imgs, _ = self.training_data[step_num]
 
-        img = img[0].numpy()
-        is_normalised = np.max(img) <= 1
+        self.assertEqual(combo_imgs.shape, (4, 256, 256, 2))
+
+        combo_img = combo_imgs[id_in_batch].numpy()
+        is_normalised = np.max(combo_img) <= 1
         self.assertTrue(is_normalised)
-        self.assertEqual(img.shape, (256, 256, 2))
-        self.assertEqual(img.dtype, np.float32)
+        self.assertEqual(combo_img.shape, (256, 256, 2))
+        self.assertEqual(combo_img.dtype, np.int32)
+
+        # visual test
+        skel_part = combo_img[..., 0]
+        node_pair = combo_img[..., 1]
+        plot_bgr_img(skel_part, "test_input_data: skel_part", show=True)
+        plot_bgr_img(node_pair, "test_input_data: node_pair", show=True)
+
+        # make sure only one node pair is in the image
+        pair_rc = np.argwhere(node_pair)
+        self.assertEqual(pair_rc.shape, (2, 2))
 
     def test_output_data(self):
         step_num = 0
@@ -210,37 +221,14 @@ class TestEdgeDGSingle(unittest.TestCase):
         combos = self.training_data.unbatched_combos.as_numpy_iterator()
         assert len(list(combos)) < len(list(all_combos))
 
-    def _choose_step_num(self):
-        """Ensures that a batch is chosen which contains a connected (adjacency) node pair."""
-        has_adjacency = False
-        step_num = 0
-
-        while has_adjacency is False:
-            adjacencies = self.training_data[step_num][1][0]
-            has_adjacency = 1 in adjacencies
-
-            if has_adjacency:
-                break
-            else:
-                step_num += 1
-
-        return step_num
-
     def test_plot_training_sample(self):
-        step_num = self._choose_step_num()
-
-        pos_list = self.training_data.pos_list.numpy()
-        combos = self.training_data.get_combo(step_num).numpy()
-
-        pairs_xy = [pos_list[combo] for combo in combos]
-
-        plot_bgr_img(self.training_data.skel_img, show=True)
-        plot_node_pairs_on_skel(self.training_data.skel_img, pairs_xy, show=True)
+        overflow = True
+        step_num = 0 if not overflow else 100
         plot_training_sample(
             self.training_data,
             step_num=step_num,
             network=self.network.id,
-            combos=combos,
+            rows=self.training_data.batch_size,
         )
 
 
@@ -270,7 +258,6 @@ class TestEdgeDGMultiple(unittest.TestCase):
             self.training_data,
             step_num=step_num,
             network=self.network.id,
-            multiple=True,
             rows=self.training_data.node_pairs_image,
         )
 
