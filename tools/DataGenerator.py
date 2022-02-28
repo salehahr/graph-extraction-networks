@@ -417,22 +417,6 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
         else:
             return combo_imgs, adjacencies
 
-    def get_combo(self, i: int):
-        return self._get_derived_data(i, "combos")
-
-    def get_pos_list(self, i: int):
-        return self._get_derived_data(i, "pos_list")
-
-    def _get_derived_data(self, i: int, key: str):
-        assert key in self.__dict__.keys()
-        val = self.__dict__[key][i]
-
-        if val is None:
-            self.__getitem__(i)
-            return self.__dict__[key][i]
-        else:
-            return val
-
 
 class EdgeDGSingle(tf.keras.utils.Sequence):
     """
