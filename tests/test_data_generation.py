@@ -10,6 +10,7 @@ from tools import (
     RunConfig,
     TestType,
     get_eedg,
+    get_eedg_multiple,
     get_gedg,
     run,
 )
@@ -233,6 +234,81 @@ class TestEdgeDGSingle(unittest.TestCase):
 
 
 class TestEdgeDGMultiple(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        ds_config_fp = "test_config.yaml"
+        run_config_fp = "test_wandb_config_edge.yaml"
+        cls.config, cls.run_config = run.get_configs(ds_config_fp, run_config_fp)
+        cls.network = cls.config.network.edge_extraction
+
+        eedg = get_eedg_multiple(cls.config, cls.run_config, with_path=True)
+        cls.training_data = eedg[TestType.TRAINING]
+        cls.validation_data = eedg[TestType.VALIDATION]
+
+    def test_training_generator(self):
+        self.assertEqual(len(self.training_data), 8)
+        cycle_through_items(self.training_data)
+
+    def test_validation_generator(self):
+        self.assertEqual(len(self.validation_data), 2)
+        cycle_through_items(self.validation_data)
+
+    def test_plot_training_sample(self):
+        step_num = 0
+        plot_training_sample(
+            self.training_data,
+            step_num=step_num,
+            network=self.network.id,
+            rows=self.training_data.node_pairs_image,
+        )
+
+    def test_input_data(self):
+        step_num = 0
+        id_in_batch = 0
+
+        x, _ = self.validation_data[step_num]
+        self.assertEqual(x.shape, (12, 256, 256, 3))
+
+        combo_img = x[id_in_batch].numpy()
+        is_normalised = np.max(combo_img) <= 1
+        self.assertTrue(is_normalised)
+        self.assertEqual(combo_img.shape, (256, 256, 3))
+        self.assertEqual(combo_img.dtype, np.int32)
+
+        # visual test
+        skel_part = combo_img[..., 0]
+        node_pair = combo_img[..., 1]
+        node_pos = combo_img[..., 2]
+        plot_bgr_img(skel_part, "test_input_data: skel_part", show=True)
+        plot_bgr_img(node_pair, "test_input_data: node_pair", show=True)
+        plot_bgr_img(node_pos, "test_input_data: node_pos", show=True)
+
+        # make sure only one node pair is in the image
+        pair_rc = np.argwhere(node_pair)
+        self.assertEqual(pair_rc.shape, (2, 2))
+
+    def test_output_data(self):
+        step_num = 0
+
+        _, (adjacencies, paths) = self.training_data[step_num]
+
+        adjacencies = adjacencies.numpy()
+        self.assertEqual(adjacencies.shape, (12, 1))
+        check_alternating(adjacencies)
+
+        paths = [p[0] for p in paths.numpy()]
+        self.assertEqual(len(paths), 12)
+
+        for a, p in zip(adjacencies, paths):
+            self.assertEqual(a.dtype, np.int32)
+            self.assertTrue(a in [0, 1])
+
+            is_normalised = np.max(p) <= 1
+            self.assertTrue(is_normalised)
+            self.assertEqual(np.max(p), a)
+
+
+class TestEdgeDG(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         ds_config_fp = "test_config.yaml"

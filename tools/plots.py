@@ -16,7 +16,7 @@ from tools.node_classifiers import NodeDegrees
 from tools.postprocessing import classify
 
 if TYPE_CHECKING:
-    from tools import EdgeDGMultiple, EdgeDGSingle
+    from tools import EdgeDG, EdgeDGSingle
 
 
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
@@ -145,7 +145,7 @@ def plot_sample_adj_nn(data_generator, step_num: int, row: int, rows: int, **kwa
 
 
 def plot_sample_edge_nn(
-    data_generator: Union[EdgeDGSingle, EdgeDGMultiple],
+    data_generator: Union[EdgeDGSingle, EdgeDG],
     step_num: int,
     row: int,
     num_rows: int,

@@ -3,7 +3,7 @@ import shutil
 import unittest
 
 from model import VGG16
-from tools import TestType, get_eedg, get_gedg, run
+from tools import TestType, get_eedg, run
 
 
 class TestEdgeNN(unittest.TestCase):
@@ -21,8 +21,7 @@ class TestEdgeNN(unittest.TestCase):
         cls.model = cls._init_model(num_filters)
         cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
-        cls.graph_data = get_gedg(cls.config)
-        cls.edge_data = get_eedg(cls.config, cls.run_config, cls.graph_data)
+        cls.edge_data = get_eedg(cls.config, cls.run_config)
 
     @classmethod
     def _init_model(cls, num_filters: int) -> VGG16:

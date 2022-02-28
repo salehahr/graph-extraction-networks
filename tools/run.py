@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import tensorflow as tf
 
     from model import UNet
-    from tools import EdgeDGMultiple
+    from tools import EdgeDG
 
 
 def get_configs(config_fp: str, run_config_fp: str) -> Tuple[Config, RunConfig]:
@@ -113,7 +113,7 @@ def load_model(
 
 def train(
     model_: Union[VGG16, UNet],
-    data: Dict[TestType, EdgeDGMultiple],
+    data: Dict[TestType, EdgeDG],
     epochs: Optional[int] = None,
     max_num_images: Optional[int] = None,
     steps_in_epoch: Optional[int] = None,
@@ -165,7 +165,7 @@ def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
 
 def predict(
     model_: VGG16,
-    val_data: EdgeDGMultiple,
+    val_data: EdgeDG,
     max_pred: int = 5,
     only_adj_nodes: bool = False,
     show: bool = False,
@@ -217,7 +217,7 @@ def predict(
                 break
 
         step_num, id_in_batch = increment_step(
-            step_num, id_in_batch, val_data.effective_batch_size
+            step_num, id_in_batch, val_data.batch_size
         )
 
     prediction.add(table, "predictions")
@@ -226,7 +226,7 @@ def predict(
 
 
 def choose_step_num(
-    val_data: EdgeDGMultiple,
+    val_data: EdgeDG,
     step_num: int = 0,
     id_in_batch: int = 0,
     pick_adj: bool = True,
@@ -243,7 +243,7 @@ def choose_step_num(
             break
 
         step_num, id_in_batch = increment_step(
-            step_num, id_in_batch, val_data.effective_batch_size
+            step_num, id_in_batch, val_data.batch_size
         )
 
     return step_num, id_in_batch
@@ -270,7 +270,7 @@ class PredictionCallback(Callback):
     def __init__(
         self,
         frequency: int,
-        validation_data: EdgeDGMultiple,
+        validation_data: EdgeDG,
         total_epochs: Optional[int] = None,
     ):
         super().__init__()
