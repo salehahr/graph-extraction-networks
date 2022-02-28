@@ -266,19 +266,21 @@ class TestEdgeDGMultiple(unittest.TestCase):
         id_in_batch = 0
 
         x, _ = self.validation_data[step_num]
-        self.assertEqual(x.shape, (12, 256, 256, 2))
+        self.assertEqual(x.shape, (12, 256, 256, 3))
 
         combo_img = x[id_in_batch].numpy()
         is_normalised = np.max(combo_img) <= 1
         self.assertTrue(is_normalised)
-        self.assertEqual(combo_img.shape, (256, 256, 2))
+        self.assertEqual(combo_img.shape, (256, 256, 3))
         self.assertEqual(combo_img.dtype, np.int32)
 
         # visual test
         skel_part = combo_img[..., 0]
         node_pair = combo_img[..., 1]
+        node_pos = combo_img[..., 2]
         plot_bgr_img(skel_part, "test_input_data: skel_part", show=True)
         plot_bgr_img(node_pair, "test_input_data: node_pair", show=True)
+        plot_bgr_img(node_pos, "test_input_data: node_pos", show=True)
 
         # make sure only one node pair is in the image
         pair_rc = np.argwhere(node_pair)

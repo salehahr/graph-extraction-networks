@@ -520,7 +520,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             rc_to_node_combo_img(rc1, rc2, self.skel_img.shape) for (rc1, rc2) in coords
         ]
         combo_imgs = [
-            np.stack([self.skel_img, np_im], axis=-1).astype(np.uint8)
+            np.stack([self.skel_img, np_im, self.node_pos], axis=-1).astype(np.uint8)
             for np_im in node_pair_imgs
         ]
 
