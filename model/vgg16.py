@@ -7,7 +7,7 @@ from tensorflow.keras.layers import GlobalMaxPooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
-from model.utils import double_conv, input_tensor, pooling, single_conv
+from model.utils import double_conv, input_tensor, pooling, single_conv, sum_across
 
 
 class VGG16(Model):
@@ -62,7 +62,7 @@ class VGG16(Model):
             x = double_conv(
                 x,
                 self.n_filters * 2 ** (i - 1),
-                f"relu_C2_block{i}",
+                f"block{i}",
                 normalise=True,
             )
             x = pooling(x, dropout_rate=0)
@@ -76,7 +76,9 @@ class VGG16(Model):
         final_block_num = self.n_conv2_blocks + self.n_conv3_blocks
 
         for i in range(self.n_conv2_blocks + 1, final_block_num + 1):
-            x = double_conv(x, self.n_filters * 2 ** (i - 1), name=None, normalise=True)
+            x = double_conv(
+                x, self.n_filters * 2 ** (i - 1), f"block{i}", normalise=True
+            )
             x = single_conv(
                 x,
                 self.n_filters * 2 ** (i - 1),
@@ -121,3 +123,64 @@ class VGG16(Model):
             save_weights_only=True,
             save_freq=save_frequency,
         )
+
+
+class EdgeNN(VGG16):
+    def __init__(
+        self,
+        input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
+        n_filters: int,
+        n_conv2_blocks: int = 2,
+        n_conv3_blocks: int = 3,
+        pretrained_weights=None,
+        learning_rate: float = 0.01,
+    ):
+        self._input_sum: tf.Tensor
+        self._node_pair: tf.Tensor
+
+        super(EdgeNN, self).__init__(
+            input_size,
+            n_filters,
+            n_conv2_blocks,
+            n_conv3_blocks,
+            pretrained_weights,
+            learning_rate,
+        )
+
+    def _build_layers(self, input_size):
+        self._set_input(input_size)
+        self._set_conv2_blocks()
+        self._set_conv3_blocks()
+        self._set_output_block()
+
+    def _set_input(
+        self, input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]]
+    ) -> None:
+        skel_img = input_tensor(input_size, name="skel_img")
+        node_pos = input_tensor(input_size, name="node_pos")
+        node_pair = input_tensor(input_size, name="node_pair")
+
+        self._input = [skel_img, node_pos, node_pair]
+
+        input_sum = sum_across([skel_img, node_pos, node_pair], name="summation")
+
+        self._input_sum = input_sum
+        self._node_pair = node_pair
+
+    def _set_conv2_blocks(self) -> None:
+        x = self._input_sum
+
+        # Default: Blocks 1, 2
+        for i in range(1, self.n_conv2_blocks + 1):
+            node_pair = self._node_pair if i == 1 else None
+
+            x = double_conv(
+                x,
+                self.n_filters * 2 ** (i - 1),
+                f"block{i}",
+                normalise=True,
+                concat_value=node_pair,
+            )
+            x = pooling(x, dropout_rate=0)
+
+        self._conv2_output = x

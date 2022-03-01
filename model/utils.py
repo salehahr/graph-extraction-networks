@@ -1,5 +1,6 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
+import tensorflow as tf
 from keras.layers import (
     Activation,
     BatchNormalization,
@@ -7,6 +8,7 @@ from keras.layers import (
     Conv2DTranspose,
     Dropout,
     Input,
+    Layer,
     MaxPooling2D,
     concatenate,
 )
@@ -24,8 +26,11 @@ File that defines layers for u-net model.
 
 
 # function that defines input layers for given shape
-def input_tensor(input_size: Tuple[int, int, int]) -> Input:
-    x = Input(input_size, name="input")
+def input_tensor(
+    input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
+    name: str = "input",
+) -> Input:
+    x = Input(input_size, name=name)
     return x
 
 
@@ -55,32 +60,30 @@ def single_conv(
 def double_conv(
     input_tensor,
     n_filters: int,
-    name: Optional[str],
+    name: str,
     kernel_size: int = 3,
     normalise: bool = True,
+    activation: str = "relu",
+    concat_value=None,
 ):
-    x = Conv2D(
-        filters=n_filters,
-        kernel_size=(kernel_size, kernel_size),
-        padding="same",
-        kernel_initializer="he_normal",
-    )(input_tensor)
+    x = input_tensor
+    for i in range(2):
+        x = Conv2D(
+            filters=n_filters,
+            kernel_size=(kernel_size, kernel_size),
+            padding="same",
+            kernel_initializer="he_normal",
+            name=f"conv2d_{i}_{name}",
+        )(x)
 
-    if normalise:
-        x = BatchNormalization()(x)
+        if normalise:
+            x = BatchNormalization(name=f"bn{i}_{name}")(x)
 
-    x = Activation("relu")(x)
-    x = Conv2D(
-        filters=n_filters,
-        kernel_size=(kernel_size, kernel_size),
-        padding="same",
-        kernel_initializer="he_normal",
-    )(x)
+        if concat_value is not None:
+            x = concatenate([x, concat_value], axis=-1)
 
-    if normalise:
-        x = BatchNormalization()(x)
+        x = Activation(activation, name=f"relu{i}_{name}")(x)
 
-    x = Activation("relu", name=name)(x)
     return x
 
 
@@ -121,3 +124,16 @@ def pooling(input_tensor, dropout_rate=0.1):
 def merge(input1, input2):
     x = concatenate([input1, input2])
     return x
+
+
+def sum_across(inputs: List, name: Optional[str] = None):
+    return SummationLayer(name=name)(inputs)
+
+
+class SummationLayer(Layer):
+    def __init__(self, *args, **kwargs):
+        super(SummationLayer, self).__init__(*args, **kwargs)
+
+    def call(self, inputs, **kwargs):
+        concat_inputs = tf.concat(inputs, axis=-1)
+        return tf.math.reduce_sum(concat_inputs, axis=-1, keepdims=True)

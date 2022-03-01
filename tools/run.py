@@ -10,7 +10,7 @@ import wandb
 from keras.callbacks import Callback
 from wandb.integration.keras import WandbCallback
 
-from model import VGG16
+from model import EdgeNN
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
 from tools.postprocessing import classify
@@ -71,16 +71,13 @@ def sweep(run_config: RunConfig, train_func: Callable, count: int):
 def load_model(
     config: Config,
     run_config: RunConfig,
-    model_: Optional[VGG16] = None,
-) -> VGG16:
+    model_: Optional[EdgeNN] = None,
+) -> EdgeNN:
     """Either initialises a new model or loads an existing model."""
     # initialise model
     if model_ is None:
-        model_ = VGG16(
-            input_size=(
-                *config.img_dims,
-                config.network.edge_extraction.input_channels,
-            ),
+        model_ = EdgeNN(
+            input_size=(*config.img_dims, 1),
             n_filters=wandb.config.n_filters,
             n_conv2_blocks=wandb.config.n_conv2_blocks,
             n_conv3_blocks=wandb.config.n_conv3_blocks,
@@ -112,7 +109,7 @@ def load_model(
 
 
 def train(
-    model_: Union[VGG16, UNet],
+    model_: Union[EdgeNN, UNet],
     data: Dict[TestType, EdgeDG],
     epochs: Optional[int] = None,
     max_num_images: Optional[int] = None,
@@ -153,7 +150,7 @@ def train(
     return history
 
 
-def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
+def save(model_: EdgeNN, filename: str, in_wandb_dir: bool = True) -> str:
     if in_wandb_dir:
         run_dir = wandb.run.dir
         filename = filename if run_dir in filename else os.path.join(run_dir, filename)
@@ -164,7 +161,7 @@ def save(model_: VGG16, filename: str, in_wandb_dir: bool = True) -> str:
 
 
 def predict(
-    model_: VGG16,
+    model_: EdgeNN,
     val_data: EdgeDG,
     max_pred: int = 5,
     only_adj_nodes: bool = False,

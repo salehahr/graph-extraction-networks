@@ -2,7 +2,7 @@ import os
 import shutil
 import unittest
 
-from model import VGG16
+from model import EdgeNN
 from tools import TestType, get_eedg, run
 
 
@@ -24,11 +24,11 @@ class TestEdgeNN(unittest.TestCase):
         cls.edge_data = get_eedg(cls.config, cls.run_config)
 
     @classmethod
-    def _init_model(cls, num_filters: int) -> VGG16:
-        edge_nn = VGG16(
-            input_size=(*cls.config.img_dims, cls.network.input_channels),
+    def _init_model(cls, num_filters: int) -> EdgeNN:
+        edge_nn = EdgeNN(
+            input_size=(*cls.config.img_dims, 1),
             n_filters=num_filters,
-            pretrained_weights=cls.weights,
+            pretrained_weights=None,
         )
         edge_nn.build()
         return edge_nn
@@ -39,18 +39,22 @@ class TestEdgeNN(unittest.TestCase):
             if os.path.isdir(d):
                 shutil.rmtree(d)
             os.makedirs(d)
-        run.start(self.run_config)
+
+    def test_model_output_shapes(self):
+        sum_output = self.model.get_layer("summation").output
+        self.assertEqual(sum_output.shape[1:], (256, 256, 1))
 
     def test_train(self) -> None:
-        short_training_run = False
+        run.start(self.run_config)
+        short_training_run = True
         run.train(
             self.model, self.edge_data, debug=short_training_run, predict_frequency=2
         )
+        run.end()
 
     def test_predict(self) -> None:
+        run.start(self.run_config)
         run.predict(
             self.model, self.edge_data[TestType.VALIDATION], max_pred=5, show=True
         )
-
-    def tearDown(self) -> None:
         run.end()
