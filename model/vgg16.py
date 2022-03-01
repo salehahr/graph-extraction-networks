@@ -26,22 +26,37 @@ class VGG16(Model):
 
         self.learning_rate = learning_rate
 
-        x = input_tensor(input_size)
-        out = self._conv2_blocks(x)
-        out = self._conv3_blocks(out)
+        # intermediate outputs
+        self._input: tf.Tensor
+        self._conv2_output: tf.Tensor
+        self._conv3_output: tf.Tensor
+        self._output: tf.Tensor
 
-        out = GlobalMaxPooling2D(data_format="channels_last", keepdims=True)(out)
-        out = tf.keras.layers.Conv1D(1, 1, activation="sigmoid")(out)
-        out = tf.squeeze(out, name="adj_output", axis=[1, 2])  # shape: (None, 1)
+        self._build_layers(input_size)
 
         # initialize Keras Model with defined above input and output layers
-        super(VGG16, self).__init__(inputs=x, outputs=out, name="EdgeNN")
+        super(VGG16, self).__init__(
+            inputs=self._input, outputs=self._output, name="EdgeNN"
+        )
 
         # load pretrained weights
         if pretrained_weights is not None and os.path.isfile(pretrained_weights):
             self.load_weights(pretrained_weights)
 
-    def _conv2_blocks(self, x: tf.Tensor):
+    def _build_layers(self, input_size):
+        self._set_input(input_size)
+        self._set_conv2_blocks()
+        self._set_conv3_blocks()
+        self._set_output_block()
+
+    def _set_input(
+        self, input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]]
+    ) -> None:
+        self._input = input_tensor(input_size)
+
+    def _set_conv2_blocks(self) -> None:
+        x = self._input
+
         # Default: Blocks 1, 2
         for i in range(1, self.n_conv2_blocks + 1):
             x = double_conv(
@@ -52,9 +67,11 @@ class VGG16(Model):
             )
             x = pooling(x, dropout_rate=0)
 
-        return x
+        self._conv2_output = x
 
-    def _conv3_blocks(self, x: tf.Tensor):
+    def _set_conv3_blocks(self) -> None:
+        x = self._conv2_output
+
         # Default: Blocks 3, 4, 5
         final_block_num = self.n_conv2_blocks + self.n_conv3_blocks
 
@@ -67,10 +84,20 @@ class VGG16(Model):
                 activation="relu",
                 name=f"relu_C3_block{i}",
                 padding=True,
+                normalise=True,
             )
             x = pooling(x, dropout_rate=0)
 
-        return x
+        self._conv3_output = x
+
+    def _set_output_block(self) -> None:
+        x = self._conv3_output
+
+        out = GlobalMaxPooling2D(data_format="channels_last", keepdims=True)(x)
+        out = tf.keras.layers.Conv1D(1, 1, activation="sigmoid")(out)
+        out = tf.squeeze(out, name="adj_output", axis=[1, 2])  # shape: (None, 1)
+
+        self._output = out
 
     def build(self, **kwargs):
         self.recompile(**kwargs)
