@@ -250,10 +250,13 @@ def choose_step_num(
 
 
 def increment_step(step_num: int, id_in_batch: int, batch_size: int) -> Tuple[int, int]:
-    if id_in_batch >= (batch_size - 1):
+    use_next_batch = id_in_batch >= (batch_size - 1)
+
+    if use_next_batch:
         step_num += 1
         id_in_batch = 0
     else:
+        # step_num = step_num -- remains the same
         id_in_batch += 1
 
     return step_num, id_in_batch
@@ -283,5 +286,5 @@ class PredictionCallback(Callback):
             predict(
                 self.model,
                 self.validation_data,
-                description=f"Prediction on epoch {epoch}/{self.total_epochs}.",
+                description=f"Prediction on epoch {epoch + 1}/{self.total_epochs}.",
             )
