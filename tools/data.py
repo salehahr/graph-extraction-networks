@@ -182,19 +182,14 @@ def node_pair_to_coords(
 def get_combo_imgs(
     batch_combo: tf.Tensor,
     skel_img: tf.Tensor,
-    node_pos: tf.Tensor,
     pos_list: tf.Tensor,
-) -> tf.Tensor:
+) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
     coords = [node_pair_to_coords(p, pos_list) for p in batch_combo]
     node_pair_imgs = [
         rc_to_node_combo_img(rc1, rc2, skel_img.shape) for (rc1, rc2) in coords
     ]
-    combo_imgs = [
-        np.stack([skel_img, np_im, node_pos], axis=-1).astype(np.uint8)
-        for np_im in node_pair_imgs
-    ]
 
-    return tf.stack(combo_imgs)
+    return tf.stack(node_pair_imgs)
 
 
 def get_combo_adjacency(pair: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:

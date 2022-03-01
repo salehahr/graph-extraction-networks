@@ -173,49 +173,44 @@ def predict(
     )
     table = wandb.Table(columns=["adj_pred", "adj_true", "image"])
 
-    num_imgs = val_data.images_in_batch
-    num_combos = val_data.node_pairs_image
-
-    step_num = 0
     id_in_batch = 0
-    max_steps = math.ceil(max_pred / val_data.node_pairs_batch)
+    step_num = 0
+    counter = 0
+    while counter < max_pred:
+        try:
+            val_x, adj_true = val_data[step_num]
+        except Exception as e:
+            print(
+                f"Failed to get data from EdgeDG (len = {len(val_data)},",
+                f"node_pairs_img = {val_data.node_pairs_image})",
+                f"at step number {step_num}.",
+            )
+            raise Exception(e)
 
-    for step in range(max_steps):
+        skel_imgs, _, node_pair_imgs = val_x
+        adj_pred, _ = classify(model_.predict(val_x))
+
+        for (skel, np_im, a_pred, a_true) in zip(
+            skel_imgs, node_pair_imgs, adj_pred, adj_true
+        ):
+            pair_xy = [p for p in np.fliplr(np.argwhere(np_im))]
+            rgb_img = plot_node_pairs_on_skel(np.float32(skel), [pair_xy], show=show)
+
+            table.add_data(int(a_pred), int(a_true), wandb.Image(rgb_img))
+
+            counter += 1
+            if counter >= max_pred:
+                break
+
+        # increment step
+        step_num, id_in_batch = increment_step(
+            step_num, id_in_batch, val_data.batch_size
+        )
         if only_adj_nodes:
             # Only show predictions for adjacent nodes
             step_num, id_in_batch = choose_step_num(
                 val_data, step_num=step_num, id_in_batch=id_in_batch, pick_adj=True
             )
-        else:
-            step_num = step
-
-        combo_img, adj_true = val_data[step_num]
-        adj_pred, _ = classify(model_.predict(combo_img))
-
-        for i in range(num_imgs):
-            idx = i * num_combos
-
-            skel_img = np.float32(combo_img[idx, ..., 0].numpy())
-
-            for ii in range(num_combos):
-                node_pair_img = np.float32(combo_img[idx, ..., 1].numpy())
-                pair_xy = [p for p in np.fliplr(np.argwhere(node_pair_img))]
-
-                rgb_img = plot_node_pairs_on_skel(skel_img, [pair_xy], show=show)
-                table.add_data(
-                    int(adj_pred[idx]), int(adj_true[idx]), wandb.Image(rgb_img)
-                )
-
-                idx += 1
-                if idx >= max_pred:
-                    break
-
-            if idx >= max_pred:
-                break
-
-        step_num, id_in_batch = increment_step(
-            step_num, id_in_batch, val_data.batch_size
-        )
 
     prediction.add(table, "predictions")
 

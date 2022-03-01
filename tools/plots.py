@@ -208,6 +208,7 @@ def plot_node_pairs_on_skel(skel_img, pairs_xy: list, show: bool = False) -> np.
         skel_img = tf.image.convert_image_dtype(skel_img, tf.uint8).numpy()
     else:
         skel_img = skel_img.numpy()
+    skel_img = skel_img.squeeze()
 
     rgb_img = np.repeat(np.expand_dims(skel_img, axis=-1), 3, axis=2)
     marker_size = 3

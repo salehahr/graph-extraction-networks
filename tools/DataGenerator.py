@@ -300,7 +300,7 @@ class EdgeDG(GraphExtractionDG):
         run_config: RunConfig,
         with_path: bool,
         test_type: TestType,
-        **kwargs
+        **kwargs,
     ):
         super(EdgeDG, self).__init__(
             config, config.network.graph_extraction, test_type, **kwargs
@@ -328,41 +328,52 @@ class EdgeDG(GraphExtractionDG):
         i.e. number of steps per epoch."""
         return int(np.floor(self.num_data / self.images_in_batch))
 
-    def __getitem__(self, item: int):
+    def __getitem__(self, item: int) -> Tuple:
         (skel_imgs, node_positions, degrees), adj_matrs = super().__getitem__(item)
 
         # placeholders for data across images in gedg batch
         num_images: int = skel_imgs.shape[
             0
         ]  # not using self.images_in_batch here in case batch gets truncated
-        combo_imgs: List[Optional] = [None] * num_images
+        node_pair_imgs: List[Optional] = [None] * num_images
+        num_nodes_per_image: List[Optional] = [None] * num_images
         adjacencies = [None] * num_images
         paths = [None] * num_images
 
         # iterate over the images (self.images_in_batch)
-        for i, data in enumerate(zip(skel_imgs, node_positions, degrees, adj_matrs)):
-            skel_img, node_pos, degree, adj_matr = data
+        for i, data in enumerate(zip(skel_imgs, node_positions, adj_matrs)):
+            skel_img, node_pos, adj_matr = data
 
             # some processing
             skel_img = tf.squeeze(skel_img)
             node_pos = tf.squeeze(node_pos)
 
-            # derived cata
+            # derived data
             pos_list = sorted_pos_list_from_image(node_pos)
             num_nodes = tf.shape(pos_list)[0]
 
-            # shuffle before batching
+            # shuffle before batching -- todo: set seed for np.random
             combos = get_all_node_combinations(num_nodes)
             combos = get_reduced_node_combinations(combos, adj_matr, shuffle=True)
 
-            batch_combo = combos[0 : self.node_pairs_image]
+            # there should be enough combos to create a batch
+            try:
+                assert len(combos) > self.node_pairs_image
+            except AssertionError as e:
+                print(f"At batch number {item} (0-idx) of {self.__len__} total steps.")
+                print(
+                    f"At {i}-th (0-idx) image in batch, with {num_images} images in batch."
+                )
+                raise AssertionError(e)
 
             # iterate over node combinations (self.node_pairs_in_image)
-            x, y = self._get_io_from_skel_img(
-                skel_img, batch_combo, adj_matr, pos_list, node_pos
+            batch_combo = combos[0 : self.node_pairs_image]
+            x, y = self._get_combo_imgs_and_labels(
+                skel_img, batch_combo, adj_matr, pos_list
             )
 
-            combo_imgs[i] = x
+            node_pair_imgs[i] = x
+            num_nodes_per_image[i] = tf.shape(x)[0]
 
             if self.with_path:
                 adjacencies[i], paths[i] = y
@@ -381,29 +392,51 @@ class EdgeDG(GraphExtractionDG):
         size(combo_imgs) = 12 x 256 x 256 x 2
         size(adjacencies) = 12 x 1
         """
-        combo_imgs = tf.concat(combo_imgs, axis=0)
+        node_pair_imgs = tf.concat(node_pair_imgs, axis=0)
         adjacencies = tf.concat(adjacencies, axis=0)
+
+        # repeat skel_imgs and node_positions values to match dimensions of node_pair_imgs
+        skel_imgs_per_combo = [
+            tf.stack([s for _ in range(n)])
+            for n, s in zip(num_nodes_per_image, skel_imgs)
+        ]
+        node_positions_per_combo = [
+            tf.stack([s for _ in range(n)])
+            for n, s in zip(num_nodes_per_image, node_positions)
+        ]
+
+        skel_imgs_in_batch = tf.concat(skel_imgs_per_combo, axis=0)
+        node_positions_in_batch = tf.concat(node_positions_per_combo, axis=0)
 
         if self.with_path:
             paths = tf.concat(paths, axis=0)
-            return combo_imgs, (adjacencies, paths)
+            return (skel_imgs_in_batch, node_positions_in_batch, node_pair_imgs), (
+                adjacencies,
+                paths,
+            )
         else:
-            return combo_imgs, adjacencies
+            return (
+                skel_imgs_in_batch,
+                node_positions_in_batch,
+                node_pair_imgs,
+            ), adjacencies
 
-    def _get_io_from_skel_img(
+    def _get_combo_imgs_and_labels(
         self,
         skel_img: tf.Tensor,
         batch_combo: tf.Tensor,
         adj_matr: tf.Tensor,
         pos_list: tf.Tensor,
-        node_pos: tf.Tensor,
-    ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
+    ) -> Tuple[
+        Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
+        Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]],
+    ]:
         # input data
-        x = get_combo_imgs(batch_combo, skel_img, node_pos, pos_list)
+        combo_imgs = get_combo_imgs(batch_combo, skel_img, pos_list)
 
         # labels
         adj = tf.stack([get_combo_adjacency(c, adj_matr) for c in batch_combo])
-        adj = tf.reshape(tf.stack(adj), [self.node_pairs_image, 1])
+        adj = tf.reshape(adj, [tf.shape(adj)[0], 1])
 
         if self.with_path:
             path = [
@@ -415,7 +448,7 @@ class EdgeDG(GraphExtractionDG):
         else:
             y = adj
 
-        return x, y
+        return combo_imgs, y
 
 
 class EdgeDGMultiple(tf.keras.utils.Sequence):
