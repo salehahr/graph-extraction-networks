@@ -37,14 +37,18 @@ def single_conv(
     name: str,
     activation: str,
     padding: bool,
+    normalise: bool = True,
 ):
-    return Conv2D(
-        name=name,
+    x = Conv2D(
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
-        activation=activation,
         padding="same" if padding is True else None,
     )(input_tensor)
+
+    if normalise:
+        x = BatchNormalization()(x)
+
+    return Activation(activation, name=name)(x)
 
 
 # function that defines two sequential 2D convolutional layers with certain number of filters

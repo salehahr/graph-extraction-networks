@@ -121,13 +121,31 @@ class NodesNN(UNet):
 
     def _get_outputs(self):
         self.node_pos = single_conv(
-            self.final_layer, 1, 1, name="node_pos", activation="sigmoid"
+            self.final_layer,
+            1,
+            1,
+            name="node_pos",
+            activation="sigmoid",
+            normalise=False,
+            padding=None,
         )
         self.degrees = single_conv(
-            self.final_layer, 5, 1, name="degrees", activation="softmax"
+            self.final_layer,
+            5,
+            1,
+            name="degrees",
+            activation="softmax",
+            normalise=False,
+            padding=None,
         )
         self.node_types = single_conv(
-            self.final_layer, 4, 1, name="node_types", activation="softmax"
+            self.final_layer,
+            4,
+            1,
+            name="node_types",
+            activation="softmax",
+            normalise=False,
+            padding=None,
         )
 
         return [self.node_pos, self.degrees, self.node_types]
@@ -152,13 +170,31 @@ class NodesNNExtended(NodesNN):
         pre_node_types = pre_output_conv(self.final_layer, 6, name="pre_node_types")
 
         self.node_pos = single_conv(
-            pre_node_pos, 1, 1, name="node_pos", activation="sigmoid"
+            pre_node_pos,
+            1,
+            1,
+            name="node_pos",
+            activation="sigmoid",
+            normalise=False,
+            padding=None,
         )
         self.degrees = single_conv(
-            pre_degrees, 5, 1, name="degrees", activation="softmax"
+            pre_degrees,
+            5,
+            1,
+            name="degrees",
+            activation="softmax",
+            normalise=False,
+            padding=None,
         )
         self.node_types = single_conv(
-            pre_node_types, 4, 1, name="node_types", activation="softmax"
+            pre_node_types,
+            4,
+            1,
+            name="node_types",
+            activation="softmax",
+            normalise=False,
+            padding=None,
         )
 
         return [self.node_pos, self.degrees, self.node_types]
