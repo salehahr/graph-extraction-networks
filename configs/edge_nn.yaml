@@ -3,9 +3,9 @@ entity: salehah
 
 
 # run details
-run_name: test_large_dataset
+run_name: vgg_mod
 resume: false
-run_id: null
+run_id: wcxdtu93
 run_type: training
 
 
