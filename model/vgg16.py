@@ -7,7 +7,14 @@ from tensorflow.keras.layers import GlobalMaxPooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
-from model.utils import double_conv, input_tensor, pooling, single_conv, sum_across
+from model.utils import (
+    double_conv,
+    extract_combo,
+    input_tensor,
+    pooling,
+    single_conv,
+    sum_across,
+)
 from tools.timer import timer
 
 
@@ -198,10 +205,11 @@ class EdgeNN(VGG16):
 
     def _set_conv2_blocks(self) -> None:
         x = self._input_sum
+        # combo = None
 
         # Default: Blocks 1, 2
         for i in range(1, self.n_conv2_blocks + 1):
-            node_pair = self._node_pair if i == 1 else None
+            node_pair = self._node_pair if i == 1 else None  # combo
 
             x = double_conv(
                 x,
@@ -211,5 +219,6 @@ class EdgeNN(VGG16):
                 concat_value=node_pair,
             )
             x = pooling(x, dropout_rate=0)
+            # combo = extract_combo(x, [0, 0, 0, x.get_shape()[-1] - 1], [-1, -1, -1, 1])
 
         self._conv2_output = x

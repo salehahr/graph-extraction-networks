@@ -130,6 +130,10 @@ def sum_across(inputs: List, name: Optional[str] = None):
     return SummationLayer(name=name)(inputs)
 
 
+def extract_combo(input_, begin, size, name: Optional[str] = None):
+    return ComboExtraction(begin, size, name=name)(input_)
+
+
 class SummationLayer(Layer):
     def __init__(self, *args, **kwargs):
         super(SummationLayer, self).__init__(*args, **kwargs)
@@ -137,3 +141,23 @@ class SummationLayer(Layer):
     def call(self, inputs, **kwargs):
         concat_inputs = tf.concat(inputs, axis=-1)
         return tf.math.reduce_sum(concat_inputs, axis=-1, keepdims=True)
+
+
+class ComboExtraction(Layer):
+    def __init__(self, begin, size, **kwargs):
+        super(ComboExtraction, self).__init__(**kwargs)
+        self.begin = begin
+        self.size = size
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update(
+            {
+                "begin": self.begin,
+                "size": self.size,
+            }
+        )
+        return config
+
+    def call(self, input_, **kwargs):
+        return tf.slice(input_, self.begin, self.size)
