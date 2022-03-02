@@ -103,8 +103,16 @@ class Config(BaseModel):
         # training, validation, testing
         self.dataset = self.create_dataset()
         self.num_labels = len(self.dataset)
-        self.num_validation = int(self.validation_fraction * self.num_labels)
+        self.num_validation = round(self.validation_fraction * self.num_labels)
         self.num_train = self.num_labels - self.num_validation
+        try:
+            assert self.num_train > self.num_validation
+        except AssertionError as e:
+            print(
+                f"There should be more training data ({self.num_train})",
+                f"than validation data! {self.num_validation}",
+            )
+            raise AssertionError(e)
 
         self.test_ds = self.create_dataset(is_test=True)
         self.num_test = len(self.test_ds)

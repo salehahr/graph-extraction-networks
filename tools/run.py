@@ -111,6 +111,7 @@ def load_model(
 def train(
     model_: Union[EdgeNN, UNet],
     data: Dict[TestType, EdgeDG],
+    validate: bool = True,
     epochs: Optional[int] = None,
     max_num_images: Optional[int] = None,
     steps_in_epoch: Optional[int] = None,
@@ -119,10 +120,7 @@ def train(
     debug: bool = False,
 ) -> tf.keras.callbacks.History:
     epochs = wandb.config.epochs if epochs is None else epochs
-
-    validation_data = (
-        data[TestType.VALIDATION] if test_type is TestType.TRAINING else None
-    )
+    validation_data = data[TestType.VALIDATION] if validate is True else None
 
     if debug is True:
         num_steps = 3
@@ -176,6 +174,10 @@ def predict(
     id_in_batch = 0
     step_num = 0
     counter = 0
+
+    num_imgs = val_data.num_data
+    max_pred = min(max_pred, num_imgs * val_data.node_pairs_image)
+
     while counter < max_pred:
         try:
             val_x, adj_true = val_data[step_num]
@@ -274,6 +276,12 @@ class PredictionCallback(Callback):
         )
 
     def on_epoch_end(self, epoch, logs=None):
+        if self.validation_data is None:
+            return
+
+        if epoch == 0:
+            return
+
         if epoch % self.frequency == 0:
             predict(
                 self.model,

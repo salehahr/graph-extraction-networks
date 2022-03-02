@@ -68,13 +68,21 @@ def get_eedg(
     config: Config,
     run_config: RunConfig,
     with_path: Optional[bool] = False,
+    validate: bool = True,
 ) -> Dict[TestType, EdgeDG]:
     """Returns training/validation data for Edge NN."""
 
-    return {
-        test: EdgeDG(config, run_config, with_path=with_path, test_type=test)
-        for test in TestType
-    }
+    if validate:
+        return {
+            test: EdgeDG(config, run_config, with_path=with_path, test_type=test)
+            for test in TestType
+        }
+    else:
+        return {
+            TestType.TRAINING: EdgeDG(
+                config, run_config, with_path=with_path, test_type=TestType.TRAINING
+            )
+        }
 
 
 class DataGenerator(tf.keras.utils.Sequence, ABC):
