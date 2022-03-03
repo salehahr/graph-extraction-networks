@@ -3,9 +3,9 @@ entity: salehah
 
 
 # run details
-run_name: vgg_mod
-resume: false
-run_id: wcxdtu93
+run_name: vgg_mod_b1
+resume: true
+run_id: 2ni5aly4
 run_type: training
 
 
@@ -13,13 +13,12 @@ model_filename: model.h5
 
 
 parameters:
-  epochs: 50
-  learning_rate: 1e-5
+  epochs: 100
+  learning_rate: 1e-3
   batch_size: 8
   node_pairs_in_batch: 4
-  n_filters: 8
+  n_filters: 3
   n_conv2_blocks: 2
-  n_conv3_blocks: 3
-
+  n_conv3_blocks: 2
 
 sweep_config: null

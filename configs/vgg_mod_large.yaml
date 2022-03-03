@@ -1,0 +1,24 @@
+project: my-test-project
+entity: salehah
+
+
+# run details
+run_name: vgg_mod_large
+resume: false
+run_id: null
+run_type: training
+
+
+model_filename: model.h5
+
+
+parameters:
+  epochs: 50
+  learning_rate: 1e-2
+  batch_size: 8
+  node_pairs_in_batch: 4
+  n_filters: 6
+  n_conv2_blocks: 2
+  n_conv3_blocks: 2
+
+sweep_config: null
