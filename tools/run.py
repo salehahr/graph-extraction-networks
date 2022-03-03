@@ -83,6 +83,7 @@ def load_model(
             n_conv3_blocks=wandb.config.n_conv3_blocks,
             pretrained_weights=run_config.weights_path,
             learning_rate=run_config.parameters.learning_rate,
+            optimiser=run_config.parameters.optimiser,
         )
         model_.build()
 

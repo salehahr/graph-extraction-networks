@@ -142,6 +142,7 @@ class Config(BaseModel):
 
 class RunParams(BaseModel):
     # general run params
+    optimiser: Optional[str] = "adam"
     epochs: int
     learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None

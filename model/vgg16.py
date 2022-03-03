@@ -2,6 +2,7 @@ import os
 from typing import Tuple, Union
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.layers import GlobalMaxPooling2D
 from tensorflow.keras.models import Model
@@ -19,12 +20,14 @@ class VGG16(Model):
         n_conv3_blocks: int = 3,
         pretrained_weights=None,
         learning_rate: float = 0.01,
+        optimiser: str = "Adam",
     ):
         self.n_filters = n_filters
         self.n_conv2_blocks = n_conv2_blocks
         self.n_conv3_blocks = n_conv3_blocks
 
         self.learning_rate = learning_rate
+        self.optimiser = self._set_optimiser(optimiser)
 
         # intermediate outputs
         self._input: tf.Tensor
@@ -42,6 +45,14 @@ class VGG16(Model):
         # load pretrained weights
         if pretrained_weights is not None and os.path.isfile(pretrained_weights):
             self.load_weights(pretrained_weights)
+
+    def _set_optimiser(self, optimiser: str):
+        optimiser = optimiser.lower()
+
+        if optimiser == "adam":
+            return Adam(learning_rate=self.learning_rate)
+        elif optimiser == "radam":
+            return tfa.optimizers.RectifiedAdam(learning_rate=self.learning_rate)
 
     def _build_layers(self, input_size):
         self._set_input(input_size)
@@ -134,6 +145,7 @@ class EdgeNN(VGG16):
         n_conv3_blocks: int = 3,
         pretrained_weights=None,
         learning_rate: float = 0.01,
+        optimiser: str = "Adam",
     ):
         self._input_sum: tf.Tensor
         self._node_pair: tf.Tensor
@@ -145,6 +157,7 @@ class EdgeNN(VGG16):
             n_conv3_blocks,
             pretrained_weights,
             learning_rate,
+            optimiser,
         )
 
     def _build_layers(self, input_size):
