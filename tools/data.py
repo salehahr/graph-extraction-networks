@@ -81,6 +81,10 @@ def fp_to_adj_matr(fp: str) -> np.ndarray:
     return adj_matr
 
 
+def tf_fp_to_adj_matr(fp: str):
+    return tf.numpy_function(func=fp_to_adj_matr, inp=[fp], Tout=tf.uint8)
+
+
 def pos_list_from_image(node_pos_img: np.ndarray) -> np.ndarray:
     """Gets list of coordinates from the node_pos image."""
     # flip to convert (row, col) to (x, y)
@@ -93,6 +97,34 @@ def sorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:
     xy_unsorted = unsorted_pos_list_from_image(node_pos_img)
     sort_indices = get_sort_indices(xy_unsorted)
     return tf.gather(xy_unsorted, sort_indices)
+
+
+@tf.function
+def indices_for_pos_list(pos_list: tf.Tensor) -> tf.Tensor:
+    """ "Returns the indices that correspond to each node in the pos_list.
+    Generates a range of values [0, n_nodes) = original node indices."""
+    n_nodes = tf.shape(pos_list)[0]
+    return tf.range(start=0, limit=n_nodes)
+
+
+def gen_pos_indices_img(idx: np.ndarray, xy: np.ndarray, dim: int) -> np.ndarray:
+    """Generates an image containing the integer indices of the node positions,
+    at the corresponding (x,y) coordinates."""
+
+    # placeholder data type must be bigger than uint8
+    # -- if uint8, overflow can happen if there are more than 255 nodes
+    img = np.zeros((dim, dim, 1)).astype(np.uint32)
+
+    for i, (col, row) in enumerate(xy):
+        img[row, col, :] = idx[i] + 1  # add one to avoid losing first index
+
+    return img
+
+
+def tf_pos_indices_image(i, xy, img_length):
+    return tf.numpy_function(
+        func=gen_pos_indices_img, inp=[i, xy, img_length], Tout=tf.uint32
+    )
 
 
 def unsorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:

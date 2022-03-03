@@ -80,17 +80,3 @@ def draw_circles(
             cv2.circle(img, (x, y), marker_size, colours(val).colour, -1)
 
     return img
-
-
-def gen_pos_indices_img(idx: np.ndarray, xy: np.ndarray, dim: int) -> np.ndarray:
-    """Generates an image containing the integer indices of the node positions,
-    at the corresponding (x,y) coordinates."""
-
-    # placeholder data type must be bigger than uint8
-    # -- if uint8, overflow can happen if there are more than 255 nodes
-    img = np.zeros((dim, dim, 1)).astype(np.uint32)
-
-    for i, (col, row) in enumerate(xy):
-        img[row, col, :] = idx[i] + 1  # add one to avoid losing first index
-
-    return img

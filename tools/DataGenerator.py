@@ -7,30 +7,12 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 
+from tools import data as data_op
 from tools.adj_matr import transform_adj_matr
-from tools.data import (
-    ds_to_list,
-    fp_to_adj_matr,
-    fp_to_grayscale_img,
-    fp_to_node_attributes,
-    get_all_node_combinations,
-    get_combo_adjacency,
-    get_combo_imgs,
-    get_combo_path,
-    get_data_at_xy,
-    get_reduced_node_combinations,
-    rebatch,
-    sorted_pos_list_from_image,
-)
-from tools.image import gen_pos_indices_img
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
     from tools.config import Config, InputConfig, RunConfig
-
-
-def to_skel_img(fp):
-    return fp_to_grayscale_img(fp)
 
 
 def get_gedg(
@@ -147,7 +129,9 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
     def _get_data(self, i: Optional[int] = None, return_fps: bool = False):
         skel_fps, graph_fps = self._get_fps(i)
 
-        skel_imgs = skel_fps.map(to_skel_img, num_parallel_calls=tf.data.AUTOTUNE)
+        skel_imgs = skel_fps.map(
+            data_op.fp_to_grayscale_img, num_parallel_calls=tf.data.AUTOTUNE
+        )
         node_pos, degrees, node_types, adj_matr = self._get_graph_data(graph_fps)
 
         def set_shape(img: tf.Tensor) -> tf.Tensor:
@@ -191,22 +175,23 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         :return: node attributes and adjacency vector
         """
 
-        def to_node_attributes(fp):
-            return tf.numpy_function(
-                func=fp_to_node_attributes, inp=[fp, self.img_dims[0]], Tout=tf.uint8
-            )
-
-        def to_adj_matr(fp: str):
-            return tf.numpy_function(func=fp_to_adj_matr, inp=[fp], Tout=tf.uint8)
-
-        node_attrs = graph_fps.map(to_node_attributes).unbatch()
-        adj_matr = graph_fps.map(to_adj_matr).map(lambda x: tf.cast(x, tf.int32))
+        node_attrs = graph_fps.map(self._to_node_attributes).unbatch()
+        adj_matr = graph_fps.map(data_op.tf_fp_to_adj_matr).map(
+            lambda x: tf.cast(x, tf.int32)
+        )
 
         node_pos = node_attrs.window(1, shift=3).flat_map(lambda x: x)
         degrees = node_attrs.skip(1).window(1, shift=3).flat_map(lambda x: x)
         node_types = node_attrs.skip(2).window(1, shift=3).flat_map(lambda x: x)
 
         return node_pos, degrees, node_types, adj_matr
+
+    def _to_node_attributes(self, fp):
+        return tf.numpy_function(
+            func=data_op.fp_to_node_attributes,
+            inp=[fp, self.img_dims[0]],
+            Tout=tf.uint8,
+        )
 
     def _augment(self, data: List[tf.data.Dataset]):
         seed1 = random.randint(0, 100)
@@ -224,7 +209,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         return x
 
     def _rebatch(self, data: List[tf.data.Dataset]) -> List[tf.Tensor]:
-        return [rebatch(d, self.batch_size) for d in data]
+        return [data_op.rebatch(d, self.batch_size) for d in data]
 
 
 class NodeExtractionDG(DataGenerator):
@@ -277,7 +262,7 @@ class GraphExtractionDG(DataGenerator):
         skel_imgs, node_pos, degrees, adj_matrs = self._rebatch(data)
 
         if return_filepaths:
-            filepaths: List[str] = ds_to_list(filepaths)
+            filepaths: List[str] = data_op.ds_to_list(filepaths)
             return (skel_imgs, node_pos, degrees), adj_matrs, filepaths
         else:
             return (skel_imgs, node_pos, degrees), adj_matrs
@@ -288,24 +273,19 @@ class GraphExtractionDG(DataGenerator):
 
         # get pos list from node_pos image
         pos_list = node_pos.map(
-            sorted_pos_list_from_image, num_parallel_calls=tf.data.AUTOTUNE
+            data_op.sorted_pos_list_from_image, num_parallel_calls=tf.data.AUTOTUNE
         )
 
-        # generate a range of values [0, n_nodes) = original node indices
-        def gen_idx(pos: tf.Tensor):
-            n_nodes = tf.shape(pos)[0]
-            return tf.range(start=0, limit=n_nodes)
-
-        idx = pos_list.map(gen_idx, num_parallel_calls=tf.data.AUTOTUNE)
-
-        def to_img(i, xy):
-            return tf.numpy_function(
-                func=gen_pos_indices_img, inp=[i, xy, self.img_dims[0]], Tout=tf.uint32
-            )
+        idx = pos_list.map(
+            data_op.indices_for_pos_list, num_parallel_calls=tf.data.AUTOTUNE
+        )
 
         return tf.data.Dataset.zip((idx, pos_list)).map(
-            to_img, num_parallel_calls=tf.data.AUTOTUNE
+            self.__to_pos_indices_img, num_parallel_calls=tf.data.AUTOTUNE
         )
+
+    def __to_pos_indices_img(self, i, xy):
+        return data_op.tf_pos_indices_image(i, xy, self.img_dims[0])
 
     @staticmethod
     def _augment_adj_matr(
@@ -315,7 +295,9 @@ class GraphExtractionDG(DataGenerator):
         and returns it in RaggedTensor format."""
 
         def get_idx(img):
-            return tf.numpy_function(func=get_data_at_xy, inp=[img], Tout=tf.uint32)
+            return tf.numpy_function(
+                func=data_op.get_data_at_xy, inp=[img], Tout=tf.uint32
+            )
 
         aug_sort_indices = pos_idx_aug_img.map(get_idx)
 
@@ -387,12 +369,12 @@ class EdgeDG(GraphExtractionDG):
             node_pos = tf.squeeze(node_pos)
 
             # derived data
-            pos_list = sorted_pos_list_from_image(node_pos)
+            pos_list = data_op.sorted_pos_list_from_image(node_pos)
             num_nodes = tf.shape(pos_list)[0]
 
             # shuffle before batching -- todo: set seed for np.random
-            combos = get_all_node_combinations(num_nodes)
-            combos = get_reduced_node_combinations(
+            combos = data_op.get_all_node_combinations(num_nodes)
+            combos = data_op.get_reduced_node_combinations(
                 combos, adj_matr, shuffle=self.shuffle
             )
 
@@ -480,15 +462,15 @@ class EdgeDG(GraphExtractionDG):
         Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]],
     ]:
         # input data
-        combo_imgs = get_combo_imgs(batch_combo, skel_img, pos_list)
+        combo_imgs = data_op.get_combo_imgs(batch_combo, skel_img, pos_list)
 
         # labels
-        adj = tf.stack([get_combo_adjacency(c, adj_matr) for c in batch_combo])
+        adj = tf.stack([data_op.get_combo_adjacency(c, adj_matr) for c in batch_combo])
         adj = tf.reshape(adj, [tf.shape(adj)[0], 1])
 
         if self.with_path:
             path = [
-                get_combo_path(c, a, pos_list, skel_img)
+                data_op.get_combo_path(c, a, pos_list, skel_img)
                 for (a, c) in zip(adj, batch_combo)
             ]
             path = tf.stack(path)
@@ -674,7 +656,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             self.adj_matr = adj_matr
 
         # derived data
-        self.pos_list = sorted_pos_list_from_image(self.node_pos)
+        self.pos_list = data_op.sorted_pos_list_from_image(self.node_pos)
 
         # dimensions
         network: InputConfig = config.network.edge_extraction
@@ -689,8 +671,8 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
 
         # shuffle before batching
-        all_combos = get_all_node_combinations(n)
-        self.combos = get_reduced_node_combinations(
+        all_combos = data_op.get_all_node_combinations(n)
+        self.combos = data_op.get_reduced_node_combinations(
             all_combos, self.adj_matr, shuffle=True
         )
 
@@ -710,7 +692,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         return len(self.combos)
 
     def on_epoch_end(self):
-        self.combos = get_reduced_node_combinations(
+        self.combos = data_op.get_reduced_node_combinations(
             self.combos, self.adj_matr, shuffle=True
         )
 
@@ -732,7 +714,9 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             idx * self.batch_size : idx * self.batch_size + self.batch_size
         ]
 
-        x = get_combo_imgs(batch_combo, self.skel_img, self.node_pos, self.pos_list)
+        x = data_op.get_combo_imgs(
+            batch_combo, self.skel_img, self.node_pos, self.pos_list
+        )
         y = self._get_labels(batch_combo)
 
         return x, y
@@ -745,12 +729,12 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self, batch_combo: tf.Tensor
     ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
 
-        adj = [get_combo_adjacency(c, self.adj_matr) for c in batch_combo]
+        adj = [data_op.get_combo_adjacency(c, self.adj_matr) for c in batch_combo]
 
         path = None
         if self.with_path:
             path = [
-                get_combo_path(c, a, self.pos_list, self.skel_img)
+                data_op.get_combo_path(c, a, self.pos_list, self.skel_img)
                 for (a, c) in zip(adj, batch_combo)
             ]
             path = tf.stack(path)
