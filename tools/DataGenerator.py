@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from tools.adj_matr import transform_adj_matr
 from tools.data import (
+    ds_to_list,
     fp_to_adj_matr,
     fp_to_grayscale_img,
     fp_to_node_attributes,
@@ -69,8 +70,11 @@ def get_eedg(
     run_config: RunConfig,
     with_path: Optional[bool] = False,
     validate: bool = True,
+    debug: bool = False,
 ) -> Dict[TestType, EdgeDG]:
     """Returns training/validation data for Edge NN."""
+    # don't shuffle dataset debug mode
+    shuffle = not debug
 
     if validate:
         return {
@@ -88,9 +92,18 @@ def get_eedg(
 class DataGenerator(tf.keras.utils.Sequence, ABC):
     """Generates batches of training/validation/test data."""
 
-    def __init__(self, config, network, test_type: TestType, augmented: bool = True):
+    def __init__(
+        self,
+        config,
+        network,
+        test_type: TestType,
+        augmented: bool = True,
+        shuffle: bool = True,
+    ):
         # dataset settings
         self.test_type = test_type
+        self.shuffle = shuffle
+
         if test_type == TestType.TRAINING:
             num_data = config.num_train
             ds = config.training_ds
@@ -104,7 +117,8 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
             raise Exception
 
         # shuffle dataset before batching
-        ds = ds.shuffle(num_data, reshuffle_each_iteration=False)
+        if shuffle:
+            ds = ds.shuffle(num_data, reshuffle_each_iteration=False)
         self.ds = ds.batch(config.batch_size, num_parallel_calls=tf.data.AUTOTUNE)
 
         # dimensions
@@ -118,7 +132,8 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         self.augmented = augmented
 
         # shuffle
-        self.on_epoch_end()
+        if shuffle:
+            self.on_epoch_end()
 
     def __len__(self):
         """Denotes the number of batches per epoch
@@ -126,9 +141,10 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         return int(np.floor(self.num_data / self.batch_size))
 
     def on_epoch_end(self):
-        self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
+        if self.shuffle:
+            self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
-    def _get_data(self, i: Optional[int] = None):
+    def _get_data(self, i: Optional[int] = None, return_fps: bool = False):
         skel_fps, graph_fps = self._get_fps(i)
 
         skel_imgs = skel_fps.map(to_skel_img, num_parallel_calls=tf.data.AUTOTUNE)
@@ -143,7 +159,10 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         degrees = degrees.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
         node_types = node_types.map(set_shape, num_parallel_calls=tf.data.AUTOTUNE)
 
-        return skel_imgs, node_pos, degrees, node_types, adj_matr
+        if return_fps:
+            return skel_imgs, node_pos, degrees, node_types, adj_matr, skel_fps
+        else:
+            return skel_imgs, node_pos, degrees, node_types, adj_matr
 
     def _get_fps(self, i: Optional[int] = None):
         """
@@ -236,11 +255,14 @@ class GraphExtractionDG(DataGenerator):
         self.max_nodes: int = 300
         self.max_adj_dim: int = int(self.max_nodes * (self.max_nodes - 1) / 2)
 
-    def __getitem__(
-        self, i: int
-    ) -> Tuple[Tuple[tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor]:
+    def __getitem__(self, i: int, return_filepaths: bool = False):
         """Returns the i-th batch."""
-        skel_imgs, node_pos, degrees, _, adj_matrs = self._get_data(i)
+        if return_filepaths:
+            skel_imgs, node_pos, degrees, _, adj_matrs, filepaths = self._get_data(
+                i, return_fps=return_filepaths
+            )
+        else:
+            skel_imgs, node_pos, degrees, _, adj_matrs = self._get_data(i)
         pos_idx_img = self._to_pos_indices_img(node_pos)
 
         # augment
@@ -254,7 +276,11 @@ class GraphExtractionDG(DataGenerator):
         data = [*data[:3], adj_matrs]
         skel_imgs, node_pos, degrees, adj_matrs = self._rebatch(data)
 
-        return (skel_imgs, node_pos, degrees), adj_matrs
+        if return_filepaths:
+            filepaths: List[str] = ds_to_list(filepaths)
+            return (skel_imgs, node_pos, degrees), adj_matrs, filepaths
+        else:
+            return (skel_imgs, node_pos, degrees), adj_matrs
 
     def _to_pos_indices_img(self, node_pos: tf.data.Dataset) -> tf.data.Dataset:
         """Generates an image dataset containing the integer indices
@@ -336,8 +362,12 @@ class EdgeDG(GraphExtractionDG):
         i.e. number of steps per epoch."""
         return int(np.floor(self.num_data / self.images_in_batch))
 
-    def __getitem__(self, item: int) -> Tuple:
-        (skel_imgs, node_positions, degrees), adj_matrs = super().__getitem__(item)
+    def __getitem__(self, item: int, **kwargs) -> Tuple:
+        (
+            (skel_imgs, node_positions, degrees),
+            adj_matrs,
+            filepaths,
+        ) = super().__getitem__(item, return_filepaths=True)
 
         # placeholders for data across images in gedg batch
         num_images: int = skel_imgs.shape[
@@ -362,15 +392,25 @@ class EdgeDG(GraphExtractionDG):
 
             # shuffle before batching -- todo: set seed for np.random
             combos = get_all_node_combinations(num_nodes)
-            combos = get_reduced_node_combinations(combos, adj_matr, shuffle=True)
+            combos = get_reduced_node_combinations(
+                combos, adj_matr, shuffle=self.shuffle
+            )
 
             # there should be enough combos to create a batch
             try:
                 assert len(combos) > self.node_pairs_image
             except AssertionError as e:
-                print(f"At batch number {item} (0-idx) of {self.__len__} total steps.")
                 print(
-                    f"At {i}-th (0-idx) image in batch, with {num_images} images in batch."
+                    f"Not enough node combos found! Need {self.node_pairs_image} combos,"
+                    f"but only {len(combos)} were extracted.\n"
+                )
+                print(
+                    f"This was at batch number {item} (0-idx),"
+                    f"out of {len(self)} total steps.\n",
+                )
+                print(
+                    f"\t At {i}-th (0-idx) image in batch,\n" f"\t\t {filepaths[i]}\n",
+                    f"\t out of {num_images} images in batch.",
                 )
                 raise AssertionError(e)
 
