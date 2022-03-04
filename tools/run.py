@@ -6,10 +6,10 @@ import sys
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
-import wandb
 from keras.callbacks import Callback
 from wandb.integration.keras import WandbCallback
 
+import wandb
 from model import EdgeNN
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
@@ -81,7 +81,7 @@ def load_model(
             n_filters=wandb.config.n_filters,
             n_conv2_blocks=wandb.config.n_conv2_blocks,
             n_conv3_blocks=wandb.config.n_conv3_blocks,
-            pretrained_weights=run_config.weights_path,
+            pretrained_weights=run_config.pretrained_weights,
             learning_rate=run_config.parameters.learning_rate,
             optimiser=run_config.parameters.optimiser,
         )

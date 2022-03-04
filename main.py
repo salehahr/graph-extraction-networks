@@ -2,7 +2,6 @@ import datetime
 import os
 
 import wandb
-
 from model.unet import NodesNNExtended
 from tools import Config, NodeExtractionDG, RunConfig, TestType
 from tools.plots import plot_training_sample, show_predictions
@@ -20,7 +19,7 @@ predict_fp = os.path.join(base_path, f"img/predict_{label}.png")
 
 if __name__ == "__main__":
     conf = Config("config.yaml")
-    wandb_config = RunConfig(wandb_fp, name, data_config=conf)
+    wandb_config = RunConfig(wandb_fp, data_config=conf, name=name)
     network = conf.network.node_extraction
 
     wandb.init(

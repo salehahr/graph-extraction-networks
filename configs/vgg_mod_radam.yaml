@@ -9,9 +9,6 @@ run_id: 34lnvf06
 run_type: training
 
 
-model_filename: model.h5
-
-
 parameters:
   optimiser: radam
   epochs: 100

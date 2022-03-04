@@ -167,7 +167,7 @@ class RunConfig(BaseModel):
     run_id: Optional[str]
     run_type: Union[str, TestType]
 
-    model_filename: str
+    pretrained_weights: Optional[str] = None
 
     parameters: Union[dict, RunParams]
     sweep_config: Optional[dict]
@@ -192,9 +192,7 @@ class RunConfig(BaseModel):
     def set_run_params(cls, v):
         return RunParams(v)
 
-    def __init__(
-        self, filepath: str, name: str = None, data_config: Optional[Config] = None
-    ):
+    def __init__(self, filepath: str, data_config: Config, name: str = None):
         with open(filepath) as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -204,6 +202,13 @@ class RunConfig(BaseModel):
         self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
 
         self.run_name = name if name is not None else self.run_name
+
+        if self.pretrained_weights:
+            if data_config.base_path not in self.pretrained_weights:
+                self.pretrained_weights = os.path.join(
+                    data_config.base_path, "data", self.pretrained_weights
+                )
+            assert os.path.isfile(self.pretrained_weights)
 
         if data_config:
             # connect data_config to run_config

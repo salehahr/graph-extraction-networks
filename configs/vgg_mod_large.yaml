@@ -1,4 +1,4 @@
-project: my-test-project
+project: edge_extraction
 entity: salehah
 
 
@@ -7,9 +7,6 @@ run_name: vgg_mod_large
 resume: false
 run_id: null
 run_type: training
-
-
-model_filename: model.h5
 
 
 parameters:

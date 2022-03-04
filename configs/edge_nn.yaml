@@ -1,16 +1,19 @@
-project: edge_extraction
+project: my-test-project
 entity: salehah
 
 
 # run details
-run_name: vgg_mod_b2
-resume: true
-run_id: 2jaghqie
+run_name: vgg_mod_large
+resume: false
+run_id: null
 run_type: training
 
 
+pretrained_weights: edgenn_vgg-large_epoch001.h5
+
+
 parameters:
-  epochs: 100
+  epochs: 50
   learning_rate: 1e-2
   batch_size: 8
   node_pairs_in_batch: 4

@@ -9,9 +9,6 @@ run_id: 2ni5aly4
 run_type: training
 
 
-model_filename: model.h5
-
-
 parameters:
   epochs: 100
   learning_rate: 1e-3

@@ -2,7 +2,9 @@ from tools import get_eedg, run
 
 if __name__ == "__main__":
     # configs
-    data_config, run_config = run.get_configs("config.yaml", "configs/edge_nn.yaml")
+    data_config, run_config = run.get_configs(
+        "config.yaml", "configs/vgg_mod_large.yaml"
+    )
 
     # generate data
     edge_data = get_eedg(data_config, run_config)
@@ -15,7 +17,6 @@ if __name__ == "__main__":
 
     # train and save for next run
     run.train(edge_nn, edge_data)
-    run.save(edge_nn, run_config.model_filename)
 
     # terminate run
     run.end()

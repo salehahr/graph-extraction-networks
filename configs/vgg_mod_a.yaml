@@ -9,9 +9,6 @@ run_id: wcxdtu93
 run_type: training
 
 
-model_filename: model.h5
-
-
 parameters:
   epochs: 100
   learning_rate: 1e-5

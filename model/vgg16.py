@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -18,7 +18,7 @@ class VGG16(Model):
         n_filters: int,
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
-        pretrained_weights=None,
+        pretrained_weights: Optional[str] = None,
         learning_rate: float = 0.01,
         optimiser: str = "Adam",
     ):
@@ -143,7 +143,7 @@ class EdgeNN(VGG16):
         n_filters: int,
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
-        pretrained_weights=None,
+        pretrained_weights: Optional[str] = None,
         learning_rate: float = 0.01,
         optimiser: str = "Adam",
     ):
