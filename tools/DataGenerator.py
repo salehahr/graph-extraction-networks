@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def get_gedg(
-    config: Config, batch_size: Optional[int] = None
+    config: Config, batch_size: Optional[int] = None, augmented: bool = True
 ) -> Dict[TestType, GraphExtractionDG]:
     g_network = config.network.graph_extraction
     orig_batch_size = config.batch_size
@@ -24,7 +24,10 @@ def get_gedg(
     if batch_size is not None:
         config.batch_size = batch_size
 
-    graph_data = {test: GraphExtractionDG(config, g_network, test) for test in TestType}
+    graph_data = {
+        test: GraphExtractionDG(config, g_network, test, augmented=augmented)
+        for test in TestType
+    }
 
     if batch_size is not None:
         config.batch_size = orig_batch_size
@@ -60,13 +63,19 @@ def get_eedg(
 
     if validate:
         return {
-            test: EdgeDG(config, run_config, with_path=with_path, test_type=test)
+            test: EdgeDG(
+                config, run_config, with_path=with_path, test_type=test, shuffle=shuffle
+            )
             for test in TestType
         }
     else:
         return {
             TestType.TRAINING: EdgeDG(
-                config, run_config, with_path=with_path, test_type=TestType.TRAINING
+                config,
+                run_config,
+                with_path=with_path,
+                test_type=TestType.TRAINING,
+                shuffle=shuffle,
             )
         }
 
@@ -110,12 +119,14 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
 
-        # data_augmentation
-        self.augmented = augmented
+        # augment data when not performing validation
+        if test_type == TestType.VALIDATION:
+            self.augmented = False
+        else:
+            self.augmented = augmented
 
         # shuffle
-        if shuffle:
-            self.on_epoch_end()
+        self.on_epoch_end()
 
     def __len__(self):
         """Denotes the number of batches per epoch
@@ -242,12 +253,9 @@ class GraphExtractionDG(DataGenerator):
 
     def __getitem__(self, i: int, return_filepaths: bool = False):
         """Returns the i-th batch."""
-        if return_filepaths:
-            skel_imgs, node_pos, degrees, _, adj_matrs, filepaths = self._get_data(
-                i, return_fps=return_filepaths
-            )
-        else:
-            skel_imgs, node_pos, degrees, _, adj_matrs = self._get_data(i)
+        data_ = self._get_data(i, return_fps=return_filepaths)
+        (skel_imgs, node_pos, degrees), adj_matrs = data_[0:3], data_[4]
+
         pos_idx_img = self._to_pos_indices_img(node_pos)
 
         # augment
@@ -262,7 +270,7 @@ class GraphExtractionDG(DataGenerator):
         skel_imgs, node_pos, degrees, adj_matrs = self._rebatch(data)
 
         if return_filepaths:
-            filepaths: List[str] = data_op.ds_to_list(filepaths)
+            filepaths = data_op.ds_to_list(data_[-1])
             return (skel_imgs, node_pos, degrees), adj_matrs, filepaths
         else:
             return (skel_imgs, node_pos, degrees), adj_matrs
@@ -281,11 +289,9 @@ class GraphExtractionDG(DataGenerator):
         )
 
         return tf.data.Dataset.zip((idx, pos_list)).map(
-            self.__to_pos_indices_img, num_parallel_calls=tf.data.AUTOTUNE
+            lambda i, xy: data_op.tf_pos_indices_image(i, xy, self.img_dims[0]),
+            num_parallel_calls=tf.data.AUTOTUNE,
         )
-
-    def __to_pos_indices_img(self, i, xy):
-        return data_op.tf_pos_indices_image(i, xy, self.img_dims[0])
 
     @staticmethod
     def _augment_adj_matr(
