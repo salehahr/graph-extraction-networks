@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -156,6 +156,22 @@ def rc_to_node_combo_img(
     return img
 
 
+@tf.function
+def tf_rc_to_node_combo_img(rc1, rc2, img_dims):
+    return tf.numpy_function(
+        rc_to_node_combo_img, inp=(rc1, rc2, img_dims), Tout=tf.int64
+    )
+
+
+@tf.function
+def tf_xy_to_node_combo_img(xy1, xy2, img_dims):
+    rc1 = tf.reverse(xy1, axis=[-1])
+    rc2 = tf.reverse(xy2, axis=[-1])
+    return tf.numpy_function(
+        rc_to_node_combo_img, inp=(rc1, rc2, img_dims), Tout=tf.int64
+    )
+
+
 def get_all_node_combinations(num_nodes: tf.Tensor) -> tf.Tensor:
     indices = tf.range(num_nodes)
 
@@ -230,6 +246,31 @@ def get_combo_imgs(
     return tf.stack(node_pair_imgs)
 
 
+def get_combo_imgs_from_xy(
+    combos_xy: tf.Tensor,
+    img_dims: tf.Tensor,
+) -> tf.data.Dataset:
+    ds = tf.data.Dataset.from_tensor_slices(combos_xy).map(
+        lambda x: (x[0], x[1], img_dims)
+    )
+    return ds.map(tf_xy_to_node_combo_img)
+
+
+@tf.function
+def get_combo_inputs(
+    skel_img: tf.Tensor, node_pos_img: tf.Tensor, combos_xy: tf.Tensor
+) -> tf.data.Dataset:
+    img_dims = skel_img.shape
+    combo_imgs = get_combo_imgs_from_xy(combos_xy, img_dims)
+    num_neighbours = tf.cast(tf.shape(combos_xy)[0], tf.int64)
+
+    return (
+        combo_imgs.map(lambda x: (skel_img, node_pos_img, x))
+        .batch(num_neighbours)
+        .get_single_element()
+    )
+
+
 @tf.function
 def get_combo_adjacency(pair: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:
     n1, n2 = pair[0], pair[1]
@@ -264,8 +305,109 @@ def repeat_to_match_dims(imgs: tf.Tensor, dims: List[tf.Tensor]) -> tf.Tensor:
 
 @tf.function
 def rebatch(x: tf.data.Dataset, batch_size: int) -> tf.Tensor:
+    """Converts tf.data.Dataset object to a tf.Tensor object"""
     return (
         x.batch(batch_size, num_parallel_calls=tf.data.AUTOTUNE)
         .take(1)
         .get_single_element()
     )
+
+
+@tf.function
+def get_node_index(node_xy: tf.Tensor, pos_list: tf.Tensor) -> tf.Tensor:
+    """Given xy coordinates of the node and a list of all node positions,
+    returns the node id in the list."""
+    node_id = tf.math.reduce_all(tf.equal(pos_list, node_xy), axis=1)
+    return tf.squeeze(tf.where(node_id))
+
+
+@tf.function
+def get_node_neighbours(node_id: tf.Tensor, combos: tf.Tensor, pos_list: tf.Tensor):
+    """Returns the ids and xy positions of combinations that contain the node with id node_num."""
+    idx_contains_node = tf.math.reduce_any(tf.equal(combos, node_id), axis=1)
+    idx_contains_node = tf.where(idx_contains_node)
+    num_vals = tf.shape(idx_contains_node)[0]
+
+    combo_ids = tf.reshape(
+        tf.gather(combos, tf.squeeze(idx_contains_node)), (num_vals, 2)
+    )
+
+    """
+    node_combos_xy [n_combos, 2, 2]
+        axis 0: all the combinations corresponding to the node
+        axis 1: point1 in combo, point2 in combo
+        axis 2: x-values, y-values
+    """
+    combos_xy = tf.gather(pos_list, combo_ids)
+    return combo_ids, combos_xy
+
+
+@tf.function
+def distance(n1: tf.Tensor, n2: tf.Tensor, axis=None) -> tf.Tensor:
+    """Calculates the distance between two nodes."""
+    diff = tf.cast(n1 - n2, tf.float32)
+    return tf.math.reduce_euclidean_norm(diff, axis=axis)
+
+
+# @tf.function(experimental_relax_shapes=True)
+def nearest_neighbours(node_id, num_neighbours, all_combos, pos_list):
+    """Returns the nearest neighbours of the node at node_id."""
+    # length might be < num_neighbours if all_combos has become sparse (due to nodes being discarded)
+    combos_id, combos_xy = get_node_neighbours(node_id, all_combos, pos_list)
+    combos_p1_xy, combos_p2_xy = combos_xy[:, 0, :], combos_xy[:, 1, :]
+
+    # if length is not ok, no need to calculate nearest neighbours
+    if combos_id.shape[0] < num_neighbours:
+        return combos_id, combos_xy
+
+    # get the smallest distance
+    distances = distance(combos_p1_xy, combos_p2_xy, axis=1)
+    _, indices = tf.math.top_k(-1 * distances, k=num_neighbours)
+
+    neighbours_id = tf.gather(combos_id, indices)
+    neighbours_xy = tf.gather(combos_xy, indices)
+
+    """
+    returns neighbours_xy [k, 2, 2]
+        axis 0: all the neighbours corresponding to the node
+        axis 1: neighbour, node
+        axis 2: x-values, y-values
+    """
+    return neighbours_id, neighbours_xy
+
+
+def discard_nodes(combos_id: tf.Tensor, all_combos: tf.Tensor) -> tf.Tensor:
+    """Discard already searched node combinations.
+    This function takes a long time to execute, possibly due to the del function (runs on CPU?).
+    """
+    # [n_all_combos, n_combos, 2] -> [n_all_combos, n_combos]
+    matches = tf.map_fn(
+        lambda x: tf.math.equal(combos_id, x),
+        elems=all_combos,
+        fn_output_signature=tf.bool,
+    )
+    matches = tf.map_fn(lambda x: tf.math.reduce_all(x, axis=-1), elems=matches)
+    matches = tf.map_fn(lambda x: tf.math.reduce_any(x, axis=-1), elems=matches)
+
+    # largest indices first
+    idx_to_discard = tf.squeeze(tf.where(matches))
+    idx_to_discard = tf.reverse(idx_to_discard, axis=[0])
+
+    new_combos = tf.unstack(all_combos)
+
+    for i in idx_to_discard:
+        del new_combos[i]
+
+    # new dimensions: [n_all_combos - n_combos, 2]
+    return tf.stack(new_combos)
+
+
+def get_lookup_table(
+    node_pos: tf.Tensor, degrees: tf.Tensor
+) -> Tuple[tf.Tensor, tf.Tensor]:
+    """Returns lookup table consisting of node xy position and the corresponding degree."""
+    pos_list_xy = sorted_pos_list_from_image(node_pos)
+    pos_list_rc = tf.reverse(pos_list_xy, axis=[1])
+    degrees_list = tf.gather_nd(indices=pos_list_rc, params=tf.squeeze(degrees))
+
+    return pos_list_xy, degrees_list
