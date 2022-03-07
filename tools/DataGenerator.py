@@ -13,6 +13,8 @@ from tools.TestType import TestType
 
 if TYPE_CHECKING:
     from tools.config import Config, InputConfig, RunConfig
+GraphBatchData = Tuple[tf.Tensor, tf.Tensor, tf.Tensor]
+GraphBatchDatasets = Tuple[tf.data.Dataset, ...]
 
 
 def get_gedg(
@@ -137,7 +139,9 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         if self.shuffle:
             self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
 
-    def _get_data(self, i: Optional[int] = None, return_fps: bool = False):
+    def _get_data(
+        self, i: Optional[int] = None, return_fps: bool = False
+    ) -> GraphBatchDatasets:
         skel_fps, graph_fps = self._get_fps(i)
 
         skel_imgs = skel_fps.map(
@@ -251,7 +255,12 @@ class GraphExtractionDG(DataGenerator):
         self.max_nodes: int = 300
         self.max_adj_dim: int = int(self.max_nodes * (self.max_nodes - 1) / 2)
 
-    def __getitem__(self, i: int, return_filepaths: bool = False):
+    def __getitem__(
+        self, i: int, return_filepaths: bool = False
+    ) -> Union[
+        Tuple[GraphBatchData, tf.Tensor, List[str]],
+        Tuple[GraphBatchData, tf.Tensor],
+    ]:
         """Returns the i-th batch."""
         data_ = self._get_data(i, return_fps=return_filepaths)
         (skel_imgs, node_pos, degrees), adj_matrs = data_[0:3], data_[4]
@@ -358,9 +367,8 @@ class EdgeDG(GraphExtractionDG):
         ) = super().__getitem__(item, return_filepaths=True)
 
         # placeholders for data across images in gedg batch
-        num_images: int = skel_imgs.shape[
-            0
-        ]  # not using self.images_in_batch here in case batch gets truncated
+        # not using self.images_in_batch here in case batch gets truncated
+        num_images: int = skel_imgs.shape[0]
         node_pair_imgs: List[Optional] = [None] * num_images
         num_nodes_per_image: List[Optional] = [None] * num_images
         adjacencies = [None] * num_images
@@ -370,37 +378,13 @@ class EdgeDG(GraphExtractionDG):
         for i, data in enumerate(zip(skel_imgs, node_positions, adj_matrs)):
             skel_img, node_pos, adj_matr = data
 
-            # some processing
-            skel_img = tf.squeeze(skel_img)
-            node_pos = tf.squeeze(node_pos)
-
             # derived data
             pos_list = data_op.sorted_pos_list_from_image(node_pos)
-            num_nodes = tf.shape(pos_list)[0]
-
-            # shuffle before batching -- todo: set seed for np.random
-            combos = data_op.get_all_node_combinations(num_nodes)
-            combos = data_op.get_reduced_node_combinations(
-                combos, adj_matr, shuffle=self.shuffle
-            )
 
             # there should be enough combos to create a batch
-            try:
-                assert len(combos) > self.node_pairs_image
-            except AssertionError as e:
-                print(
-                    f"Not enough node combos found! Need {self.node_pairs_image} combos,"
-                    f"but only {len(combos)} were extracted.\n"
-                )
-                print(
-                    f"This was at batch number {item} (0-idx),"
-                    f"out of {len(self)} total steps.\n",
-                )
-                print(
-                    f"\t At {i}-th (0-idx) image in batch,\n" f"\t\t {filepaths[i]}\n",
-                    f"\t out of {num_images} images in batch.",
-                )
-                raise AssertionError(e)
+            num_nodes = tf.shape(pos_list)[0]
+            combos = self._get_combos(num_nodes, adj_matr)
+            self._assert_enough_combos(combos, item, i, filepaths[i], num_images)
 
             # iterate over node combinations (self.node_pairs_in_image)
             batch_combo = combos[0 : self.node_pairs_image]
@@ -432,17 +416,12 @@ class EdgeDG(GraphExtractionDG):
         adjacencies = tf.concat(adjacencies, axis=0)
 
         # repeat skel_imgs and node_positions values to match dimensions of node_pair_imgs
-        skel_imgs_per_combo = [
-            tf.stack([s for _ in range(n)])
-            for n, s in zip(num_nodes_per_image, skel_imgs)
-        ]
-        node_positions_per_combo = [
-            tf.stack([s for _ in range(n)])
-            for n, s in zip(num_nodes_per_image, node_positions)
-        ]
-
-        skel_imgs_in_batch = tf.concat(skel_imgs_per_combo, axis=0)
-        node_positions_in_batch = tf.concat(node_positions_per_combo, axis=0)
+        skel_imgs_in_batch = data_op.repeat_to_match_dims(
+            skel_imgs, num_nodes_per_image
+        )
+        node_positions_in_batch = data_op.repeat_to_match_dims(
+            node_positions, num_nodes_per_image
+        )
 
         if self.with_path:
             paths = tf.concat(paths, axis=0)
@@ -456,6 +435,39 @@ class EdgeDG(GraphExtractionDG):
                 node_positions_in_batch,
                 node_pair_imgs,
             ), adjacencies
+
+    def _get_combos(self, num_nodes: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:
+        # shuffle before batching -- todo: set seed for np.random
+        combos = data_op.get_all_node_combinations(num_nodes)
+        combos = data_op.get_reduced_node_combinations(
+            combos, adj_matr, shuffle=self.shuffle
+        )
+        return combos
+
+    def _assert_enough_combos(
+        self,
+        combos: tf.Tensor,
+        batch_num: int,
+        i: int,
+        current_filepath: str,
+        num_images: int,
+    ) -> None:
+        try:
+            assert len(combos) > self.node_pairs_image
+        except AssertionError as e:
+            print(
+                f"Not enough node combos found! Need {self.node_pairs_image} combos,"
+                f"but only {len(combos)} were extracted.\n"
+            )
+            print(
+                f"This was at batch number {batch_num} (0-idx),"
+                f"out of {len(self)} total steps.\n",
+            )
+            print(
+                f"\t At {i}-th (0-idx) image in batch,\n" f"\t\t {current_filepath}\n",
+                f"\t out of {num_images} images in batch.",
+            )
+            raise AssertionError(e)
 
     def _get_combo_imgs_and_labels(
         self,

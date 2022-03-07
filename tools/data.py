@@ -1,5 +1,5 @@
 import os
-from typing import Tuple
+from typing import List, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -216,6 +216,8 @@ def get_combo_imgs(
     skel_img: tf.Tensor,
     pos_list: tf.Tensor,
 ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    skel_img = tf.squeeze(skel_img)
+
     coords = [node_pair_to_coords(p, pos_list) for p in batch_combo]
     node_pair_imgs = [
         rc_to_node_combo_img(rc1, rc2, skel_img.shape) for (rc1, rc2) in coords
@@ -245,6 +247,13 @@ def get_combo_path(
         tf.cast(adjacency, tf.float32),
         tf.RaggedTensor.from_tensor(img_section),
     )
+
+
+def repeat_to_match_dims(imgs: tf.Tensor, dims: List[tf.Tensor]) -> tf.Tensor:
+    imgs_per_combo = [tf.stack([im for _ in range(n)]) for n, im in zip(dims, imgs)]
+    imgs_in_batch = tf.concat(imgs_per_combo, axis=0)
+
+    return imgs_in_batch
 
 
 def rebatch(x: tf.data.Dataset, batch_size: int) -> tf.Tensor:
