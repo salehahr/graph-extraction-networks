@@ -6,10 +6,10 @@ import sys
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
+import wandb
 from keras.callbacks import Callback
 from wandb.integration.keras import WandbCallback
 
-import wandb
 from model import EdgeNN
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
@@ -116,30 +116,29 @@ def train(
     epochs: Optional[int] = None,
     max_num_images: Optional[int] = None,
     steps_in_epoch: Optional[int] = None,
-    test_type: TestType = TestType.TRAINING,
     predict_frequency: int = 10,
     debug: bool = False,
 ) -> tf.keras.callbacks.History:
     epochs = wandb.config.epochs if epochs is None else epochs
+
+    training_data = data[TestType.TRAINING]
     validation_data = data[TestType.VALIDATION] if validate is True else None
 
-    if debug is True:
-        num_steps = 3
-    else:
-        num_steps = steps_in_epoch
-
-        if max_num_images is not None:
-            num_steps = math.ceil(
-                max_num_images / data[TestType.TRAINING].images_in_batch
-            )
+    # calculate number of steps per epoch
+    num_steps_train = _get_num_steps(
+        training_data, steps_in_epoch, max_num_images, debug
+    )
+    num_steps_validation = _get_num_steps(
+        validation_data, steps_in_epoch, max_num_images, debug
+    )
 
     history = model_.fit(
-        x=data[test_type],
+        x=training_data,
         validation_data=validation_data,
         initial_epoch=wandb.run.step,
         epochs=epochs,
-        steps_per_epoch=num_steps,
-        validation_steps=num_steps,
+        steps_per_epoch=num_steps_train,
+        validation_steps=num_steps_validation,
         callbacks=[
             WandbCallback(save_weights_only=True),
             PredictionCallback(predict_frequency, validation_data),
@@ -147,6 +146,33 @@ def train(
     )
 
     return history
+
+
+def _get_num_steps(
+    data_generator: Optional[EdgeDG],
+    steps_in_epoch: Optional[int],
+    max_num_images: Optional[int],
+    debug: bool,
+) -> Optional[int]:
+    if data_generator is None:
+        return None
+
+    if debug is True:
+        num_steps = 3
+    else:
+        num_steps = steps_in_epoch
+
+        if max_num_images is not None:
+            num_steps = _get_max_num_steps(max_num_images, data_generator)
+
+    return num_steps
+
+
+def _get_max_num_steps(max_num_images: int, data_generator: EdgeDG) -> int:
+    num_steps = math.ceil(max_num_images / data_generator.images_in_batch)
+
+    # check that the number of steps don't exceed length of the DataGenerator
+    return min(num_steps, len(data_generator))
 
 
 def save(model_: EdgeNN, filename: str, in_wandb_dir: bool = True) -> str:

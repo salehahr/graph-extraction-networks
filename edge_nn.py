@@ -16,7 +16,7 @@ if __name__ == "__main__":
     edge_nn = run.load_model(data_config, run_config)
 
     # train and save for next run
-    run.train(edge_nn, edge_data)
+    run.train(edge_nn, edge_data, max_num_images=run_config.parameters.train_imgs)
 
     # terminate run
     run.end()

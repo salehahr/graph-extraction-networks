@@ -143,6 +143,7 @@ class Config(BaseModel):
 class RunParams(BaseModel):
     # general run params
     optimiser: Optional[str] = "adam"
+    train_imgs: Optional[int]
     epochs: int
     learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None
@@ -219,6 +220,9 @@ class RunConfig(BaseModel):
             self.weights_path = os.path.join(
                 data_config.base_path, f"weights_{self.run_name}.hdf5"
             )
+
+            if self.parameters.train_imgs is None:
+                self.parameters.train_imgs = data_config.num_train
 
     @property
     def images_in_batch(self) -> int:
