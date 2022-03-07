@@ -19,7 +19,16 @@ if TYPE_CHECKING:
     from tools import EdgeDG, EdgeDGSingle
 
 
+def plot_imgs(list_imgs: List[np.ndarray], show: bool = True):
+    for im in list_imgs:
+        plot_img(im)
+
+        if show:
+            plt.show()
+
+
 def plot_img(img: np.ndarray, ax=None, cmap: Optional[str] = None):
+    """Displays image without ax ticks."""
     if not ax:
         plt.imshow(img, cmap=cmap)
         plt.xticks([])
