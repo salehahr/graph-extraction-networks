@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -34,10 +34,11 @@ def get_skeletonised_ds(
     return ds.shuffle(len(ds), seed=seed, reshuffle_each_iteration=False)
 
 
-def ds_to_list(dataset: tf.data.Dataset) -> list:
+def ds_to_list(dataset: tf.data.Dataset) -> List[str]:
     return [f.decode("utf-8") for f in dataset.as_numpy_iterator()]
 
 
+@tf.function
 def fp_to_grayscale_img(fp: tf.Tensor) -> tf.Tensor:
     raw_img = tf.io.read_file(fp)
     unscaled_img = tf.image.decode_png(raw_img, channels=1, dtype=tf.uint8)
@@ -92,6 +93,7 @@ def pos_list_from_image(node_pos_img: np.ndarray) -> np.ndarray:
     return sort_list_of_nodes(pos_list_xy)
 
 
+@tf.function
 def sorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:
     """Extracts the sorted xy coordinates from the node_pos image."""
     xy_unsorted = unsorted_pos_list_from_image(node_pos_img)
@@ -127,6 +129,7 @@ def tf_pos_indices_image(i, xy, img_length):
     )
 
 
+@tf.function
 def unsorted_pos_list_from_image(node_pos_img: tf.Tensor) -> tf.Tensor:
     """Extracts the (unsorted) xy coordinates from the node_pos image."""
     node_pos_img = tf.cast(tf.squeeze(node_pos_img), tf.uint8)
@@ -199,6 +202,7 @@ def get_reduced_node_combinations(
     return tf.stack(reduced_combos)
 
 
+@tf.function
 def node_pair_to_coords(
     pair: tf.Tensor, pos_list: tf.Tensor
 ) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -226,11 +230,13 @@ def get_combo_imgs(
     return tf.stack(node_pair_imgs)
 
 
+@tf.function
 def get_combo_adjacency(pair: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:
     n1, n2 = pair[0], pair[1]
     return adj_matr[n1, n2]
 
 
+@tf.function
 def get_combo_path(
     pair: tf.Tensor, adjacency: tf.Tensor, pos_list: tf.Tensor, skel_img: tf.Tensor
 ) -> tf.Tensor:
@@ -256,6 +262,7 @@ def repeat_to_match_dims(imgs: tf.Tensor, dims: List[tf.Tensor]) -> tf.Tensor:
     return imgs_in_batch
 
 
+@tf.function
 def rebatch(x: tf.data.Dataset, batch_size: int) -> tf.Tensor:
     return (
         x.batch(batch_size, num_parallel_calls=tf.data.AUTOTUNE)

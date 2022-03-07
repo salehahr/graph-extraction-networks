@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 
+@tf.function
 def get_sort_indices(xy_unsorted: tf.Tensor) -> tf.Tensor:
     """
     Returns the sort indices when sorting by y/rows first, then x/cols.
