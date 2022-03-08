@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from tools import EdgeDG, EdgeDGSingle
 
 
-def plot_imgs(list_imgs: List[np.ndarray], show: bool = True):
-    for im in list_imgs:
+def plot_imgs(imgs: Union[List[np.ndarray], tf.Tensor], show: bool = True):
+    for im in imgs:
         plot_img(im)
 
         if show:
