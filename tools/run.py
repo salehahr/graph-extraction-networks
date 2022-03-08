@@ -53,6 +53,10 @@ def start(
         reinit=reinit,
         id=id_,
     )
+
+    best_model_fp = os.path.join(wandb.run.dir, "model-best.h5")
+    wandb.save(glob_str=best_model_fp, base_path=wandb.run.dir, policy="live")
+
     return run_
 
 
@@ -72,23 +76,27 @@ def load_model(
     config: Config,
     run_config: RunConfig,
     model_: Optional[EdgeNN] = None,
+    do_sweep: bool = False,
+    do_train: bool = True,
 ) -> EdgeNN:
     """Either initialises a new model or loads an existing model."""
     # initialise model
+    params = wandb.config if do_sweep else run_config.parameters
+
     if model_ is None:
         model_ = EdgeNN(
             input_size=(*config.img_dims, 1),
-            n_filters=wandb.config.n_filters,
-            n_conv2_blocks=wandb.config.n_conv2_blocks,
-            n_conv3_blocks=wandb.config.n_conv3_blocks,
+            n_filters=params.n_filters,
+            n_conv2_blocks=params.n_conv2_blocks,
+            n_conv3_blocks=params.n_conv3_blocks,
             pretrained_weights=run_config.pretrained_weights,
-            learning_rate=run_config.parameters.learning_rate,
-            optimiser=run_config.parameters.optimiser,
+            learning_rate=params.learning_rate,
+            optimiser=params.optimiser,
         )
         model_.build()
 
     # load weights on resumed run
-    if wandb.run.resumed:
+    if do_train is True and wandb.run.resumed is True:
         try:
             best_model = wandb.restore(
                 "model-best.h5",
@@ -158,7 +166,7 @@ def _get_num_steps(
         return None
 
     if debug is True:
-        num_steps = 3
+        num_steps = min(3, len(data_generator))
     else:
         num_steps = steps_in_epoch
 
