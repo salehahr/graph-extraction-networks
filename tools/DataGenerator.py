@@ -287,6 +287,20 @@ class GraphExtractionDG(DataGenerator):
         else:
             return (skel_imgs, node_pos, degrees), adj_matrs
 
+    def get_single_data_point(self, i: int):
+        """Returns data for a batch size of one,
+        with squeezed dimensions for convenience."""
+        assert self.batch_size == 1
+
+        (skel_img, node_pos, degrees), adj_matr_true = self.__getitem__(i)
+
+        # squeeze [1, 256, 256, 1] to [256, 256, 1]
+        skel_img = tf.squeeze(skel_img, axis=0)
+        node_pos = tf.squeeze(node_pos, axis=0)
+        degrees = tf.squeeze(degrees, axis=0)
+
+        return (skel_img, node_pos, degrees), adj_matr_true
+
     def _to_pos_indices_img(self, node_pos: tf.data.Dataset) -> tf.data.Dataset:
         """Generates an image dataset containing the integer indices
         of the node positions, at the corresponding (x,y) coordinates."""
