@@ -128,6 +128,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
             self.augmented = augmented
 
         # shuffle
+        self.shuffle_buffer = self.num_data
         self.on_epoch_end()
 
     def __len__(self):
@@ -137,7 +138,9 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 
     def on_epoch_end(self):
         if self.shuffle:
-            self.ds = self.ds.shuffle(self.num_data, reshuffle_each_iteration=False)
+            self.ds = self.ds.shuffle(
+                self.shuffle_buffer, reshuffle_each_iteration=False
+            )
 
     def _get_data(
         self, i: Optional[int] = None, return_fps: bool = False
@@ -352,6 +355,7 @@ class EdgeDG(GraphExtractionDG):
         self.batch_size: int = self.node_pairs_batch
 
         # shuffle
+        self.shuffle_buffer = min(self.num_data, run_config.parameters.train_imgs)
         self.on_epoch_end()
 
     def __len__(self):
