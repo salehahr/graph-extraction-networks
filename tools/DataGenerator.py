@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 
+from tools import EdgeDGSingle
 from tools import data as data_op
 from tools.adj_matr import transform_adj_matr
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
-    from tools.config import Config, InputConfig, RunConfig
+    from tools.config import Config, RunConfig
+
+
 GraphBatchData = Tuple[tf.Tensor, tf.Tensor, tf.Tensor]
 GraphBatchDatasets = Tuple[tf.data.Dataset, ...]
 
@@ -657,124 +660,3 @@ class EdgeDGMultiple(tf.keras.utils.Sequence):
             return combo_imgs, (adjacencies, paths)
         else:
             return combo_imgs, adjacencies
-
-
-class EdgeDGSingle(tf.keras.utils.Sequence):
-    """
-    Generates node combinations and corresponding labels (path and adjacency)
-    from a single skeletonised image.
-    Shuffling occurs in self._get_reduced_combinations, used the self.seed attribute.
-    """
-
-    def __init__(
-        self,
-        config: Config,
-        node_pairs_in_batch: int,
-        test_type: TestType,
-        skel_img: tf.Tensor,
-        node_pos: tf.Tensor,
-        degrees: tf.Tensor,
-        adj_matr: tf.RaggedTensor,
-        with_path: bool,
-        seed: Optional[int] = None,
-    ):
-        self.test_type = test_type
-        self.with_path = with_path
-        self.seed = seed
-
-        self.skel_img = tf.squeeze(skel_img)
-        self.node_pos = tf.squeeze(node_pos)
-        self.degrees = tf.squeeze(degrees)
-
-        if adj_matr.shape.ndims == 3:
-            self.adj_matr = adj_matr[0]
-        elif adj_matr.shape.ndims == 2:
-            self.adj_matr = adj_matr
-
-        # derived data
-        self.pos_list = data_op.sorted_pos_list_from_image(self.node_pos)
-
-        # dimensions
-        network: InputConfig = config.network.edge_extraction
-        self.input_channels = network.input_channels
-        self.output_channels = network.output_channels
-        self.batch_size = node_pairs_in_batch
-        self.img_dims = config.img_dims
-
-        # node combinations
-        n = tf.shape(self.pos_list)[0]
-        self.num_nodes = n
-        self.max_combinations = tf.cast(n * (n - 1) / 2, tf.int64)
-
-        # shuffle before batching
-        all_combos = data_op.get_all_node_combinations(n)
-        self.combos = data_op.get_reduced_node_combinations(
-            all_combos, self.adj_matr, shuffle=True
-        )
-
-        # shuffle
-        self.on_epoch_end()
-
-    @property
-    def images_in_batch(self) -> int:
-        return 1
-
-    @property
-    def node_pairs_image(self) -> int:
-        return self.batch_size
-
-    @property
-    def total_combos(self):
-        return len(self.combos)
-
-    def on_epoch_end(self):
-        self.combos = data_op.get_reduced_node_combinations(
-            self.combos, self.adj_matr, shuffle=True
-        )
-
-    def __len__(self) -> int:
-        return int(np.floor(self.total_combos / self.batch_size))
-
-    def __getitem__(
-        self, i: int
-    ) -> Tuple[tf.Tensor, Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]]:
-        # allow overflow
-        is_overflow = i >= len(self)
-
-        if i > 0 and is_overflow:
-            idx = max(i, len(self)) % min(i, len(self))
-        else:
-            idx = i
-
-        batch_combo = self.combos[
-            idx * self.batch_size : idx * self.batch_size + self.batch_size
-        ]
-
-        x = data_op.get_combo_imgs(
-            batch_combo, self.skel_img, self.node_pos, self.pos_list
-        )
-        y = self._get_labels(batch_combo)
-
-        return x, y
-
-    def get_combo(self, i: int) -> tf.Tensor:
-        combo = self.combos[i * self.batch_size : i * self.batch_size + self.batch_size]
-        return tf.stack(combo)
-
-    def _get_labels(
-        self, batch_combo: tf.Tensor
-    ) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
-
-        adj = [data_op.get_combo_adjacency(c, self.adj_matr) for c in batch_combo]
-
-        path = None
-        if self.with_path:
-            path = [
-                data_op.get_combo_path(c, a, self.pos_list, self.skel_img)
-                for (a, c) in zip(adj, batch_combo)
-            ]
-            path = tf.stack(path)
-
-        adj = tf.reshape(tf.stack(adj), [self.batch_size, 1])
-
-        return adj if not self.with_path else (adj, path)
