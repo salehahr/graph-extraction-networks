@@ -44,7 +44,12 @@ class VGG16(Model):
 
         # load pretrained weights
         if pretrained_weights is not None and os.path.isfile(pretrained_weights):
+            self.pretrained = True
+            self.weights_path = pretrained_weights
             self.load_weights(pretrained_weights)
+        else:
+            self.pretrained = False
+            self.weights_path = None
 
     def _set_optimiser(self, optimiser: str):
         optimiser = optimiser.lower()
