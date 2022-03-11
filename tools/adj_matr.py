@@ -27,17 +27,16 @@ def adj_matr_to_vec(adj_matr: np.ndarray) -> np.ndarray:
 def np_update_adj_matr(
     adj_matr: np.ndarray, ids: np.ndarray, adjacencies: np.ndarray
 ) -> np.ndarray:
+    """Only produces the upper right triangle."""
     adj_matr[ids[:, 0], ids[:, 1]] = adjacencies
     return adj_matr
 
 
 @tf.function
-def update_adj_matr(adj_matr: tf.Tensor, adjacencies: tf.Tensor, pair_ids: tf.Tensor):
-    # todo: disallow zeroing a connection?
-    transposed_ids = tf.reverse(pair_ids, axis=[1])
-    ids = tf.concat((pair_ids, transposed_ids), axis=0)
-    adjacencies = tf.squeeze(tf.concat((adjacencies, adjacencies), axis=0))
-
-    return tf.numpy_function(
-        np_update_adj_matr, inp=(adj_matr, ids, adjacencies), Tout=tf.uint8
+def update_adj_matr(
+    adj_matr: tf.Tensor, adjacencies: tf.Tensor, pair_ids: tf.Tensor
+) -> tf.Tensor:
+    upper_tri = tf.numpy_function(
+        np_update_adj_matr, inp=(adj_matr, pair_ids, adjacencies), Tout=tf.uint8
     )
+    return upper_tri + tf.transpose(upper_tri)
