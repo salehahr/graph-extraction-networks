@@ -246,7 +246,25 @@ def get_subplot_id(row, col, num_cols):
     return col + 1 + num_cols * row
 
 
-def plot_adj_matr(img_skel: np.ndarray, pos: np.ndarray, adjacency: np.ndarray) -> None:
+def _lighten_skel_img(img_skel: np.ndarray, black_to_grey: float = 0.7) -> np.ndarray:
+    img = img_skel.copy() / 2
+
+    ids = np.argwhere(img_skel == 0)
+    img[ids[:, 0], ids[:, 1]] = black_to_grey
+    ids = np.argwhere(img_skel == 1)
+    img[ids[:, 0], ids[:, 1]] = np.mean([1 - black_to_grey, 1 / black_to_grey])
+
+    cmap = plt.get_cmap("gray")
+    return cmap(img)
+
+
+def plot_adj_matr(
+    img_skel: np.ndarray,
+    pos: np.ndarray,
+    adjacency: np.ndarray,
+    show: bool = True,
+    title: Optional[str] = None,
+) -> None:
     """
     Function for checking if the adjacency matrix matches the image
     by overlaying the graph over the skeletonised image.
@@ -254,7 +272,7 @@ def plot_adj_matr(img_skel: np.ndarray, pos: np.ndarray, adjacency: np.ndarray) 
     :param pos: list of position coordinates of the graph nodes
     :param adjacency: adjacency matrix of the graph
     """
-    img = img_skel.copy()
+    img = _lighten_skel_img(img_skel)
 
     img_height = img.shape[0]
     pos_dict = {i: [x, img_height - y] for i, [x, y] in enumerate(pos)}
@@ -267,7 +285,18 @@ def plot_adj_matr(img_skel: np.ndarray, pos: np.ndarray, adjacency: np.ndarray) 
     extent = 0, x_lim, 0, y_lim
 
     plt.imshow(img, extent=extent, interpolation="nearest", cmap="gray")
-    nx.draw(graph, pos=pos_dict, node_size=2, node_color="r", edge_color="g", width=1)
+    plt.title(title)
+    nx.draw(
+        graph,
+        pos=pos_dict,
+        node_size=8,
+        node_color="navajowhite",
+        edge_color="hotpink",
+        width=1.5,
+    )
+
+    if show:
+        plt.show()
 
 
 def plot_augmented(x: List[np.ndarray], y: Dict[str, List[np.ndarray]]):
