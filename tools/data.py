@@ -598,10 +598,21 @@ def get_indices_of_combos_in_node_rows(
         )
 
 
+@tf.function
+def empty_tensor(tensor: tf.Tensor) -> tf.bool:
+    return tf.equal(tf.size(tensor), 0)
+
+
 def get_combos_to_keep(
     combos: tf.Tensor, node_rows: tf.RaggedTensor, node_adjacencies: tf.RaggedTensor
 ):
     non_duplicate_combo_ids, duplicate_combo_ids = check_duplicate_combo_ids(node_rows)
+
+    # for checking if empty
+    exist_non_duplicates = tf.logical_not(empty_tensor(non_duplicate_combo_ids))
+    exist_duplicates = tf.logical_not(empty_tensor(duplicate_combo_ids))
+    if not (exist_duplicates and exist_non_duplicates):
+        tf_empty = tf.cast(tf.reshape((), (0)), tf.int64)
 
     # indices relative to node_rows.flat_values
     # [n_combos, 1]
@@ -614,28 +625,47 @@ def get_combos_to_keep(
     )
 
     # adjacencies
-    non_dup_adjs = tf.squeeze(
-        tf.gather(node_adjacencies.flat_values, _non_dup_flat_indices)
-    )
-    dup_adjs = tf.gather(node_adjacencies.flat_values, _dup_flat_indices)[..., 0]
-    dup_is_same_adj = tf.map_fn(
-        lambda x: tf.reduce_all(tf.equal(tf.reduce_mean(x), x)),
-        elems=dup_adjs,
-        fn_output_signature=tf.bool,
-    )
+    if exist_non_duplicates:
+        non_dup_adjs = tf.squeeze(
+            tf.gather(node_adjacencies.flat_values, _non_dup_flat_indices)
+        )
+    else:
+        non_dup_adjs = tf_empty
 
-    # indices relative to duplicate_combo_ids
-    _dups_to_discard_idcs = tf.where(dup_is_same_adj == False)[:, 0]
-    _dups_to_keep_idcs = tf.where(dup_is_same_adj)[:, 0]
+    if exist_duplicates:
+        dup_adjs = tf.gather(node_adjacencies.flat_values, _dup_flat_indices)[..., 0]
+        dup_is_same_adj = tf.map_fn(
+            lambda x: tf.reduce_all(tf.equal(tf.reduce_mean(x), x)),
+            elems=dup_adjs,
+            fn_output_signature=tf.bool,
+        )
 
-    combo_ids_to_discard = tf.gather(duplicate_combo_ids, _dups_to_discard_idcs)
-    exist_nodes_to_discard = tf.not_equal(tf.shape(combo_ids_to_discard), 0)
-    # if not exist_nodes_to_discard:
-    #     return combos, tf.gather(node_adjacencies.flat_values, )
+        # indices relative to duplicate_combo_ids
+        _dups_to_discard_idcs = tf.where(dup_is_same_adj == False)[:, 0]
+        _dups_to_keep_idcs = tf.where(dup_is_same_adj)[:, 0]
+
+        combo_ids_to_discard = tf.gather(duplicate_combo_ids, _dups_to_discard_idcs)
+        exist_nodes_to_discard = tf.not_equal(tf.shape(combo_ids_to_discard), 0)
+        # if not exist_nodes_to_discard:
+        #     return combos, tf.gather(node_adjacencies.flat_values, )
+
+        # take non-discarded duplicate values
+        combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
+        adjacencies = tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
+    else:
+        dup_adjs = tf_empty
+        _dups_to_keep_idcs = tf_empty
+        combo_ids = tf_empty
+        adjacencies = tf_empty
+        exist_nodes_to_discard = False
 
     # take non-discarded duplicate values
     combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
-    adjacencies = tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
+    adjacencies = (
+        tf_empty
+        if empty_tensor(dup_adjs)
+        else tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
+    )
 
     # concat with non-duplicates
     combo_ids = tf.concat((non_duplicate_combo_ids, combo_ids), axis=0)
