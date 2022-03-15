@@ -261,7 +261,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             node_degrees = self.tab_N_degrees[nodes]
 
             # skip this case if no nodes found
-            if data_op.empty_tensor(nodes):
+            if data_op.is_empty_tensor(nodes):
                 continue
 
             # first obtain case_combos (neighbour node combinations which match the case)
@@ -282,7 +282,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
                 )
 
             # skip this case if no case_combos found
-            if data_op.empty_tensor(case_combos):
+            if data_op.is_empty_tensor(case_combos):
                 continue
 
             # update adjacency matrix
@@ -314,7 +314,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     @property
     def combos_is_empty(self) -> tf.bool:
         """Are there no neighbours left?"""
-        return data_op.empty_tensor(self._combos)
+        return data_op.is_empty_tensor(self._combos)
 
     def _update_adjacencies_good_ok_nodes(
         self, node_rows: tf.RaggedTensor, tab_adjacencies: DenseHashTable

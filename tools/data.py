@@ -599,7 +599,7 @@ def get_indices_of_combos_in_node_rows(
 
 
 @tf.function
-def empty_tensor(tensor: tf.Tensor) -> tf.bool:
+def is_empty_tensor(tensor: tf.Tensor) -> tf.bool:
     return tf.equal(tf.size(tensor), 0)
 
 
@@ -609,10 +609,10 @@ def get_combos_to_keep(
     non_duplicate_combo_ids, duplicate_combo_ids = check_duplicate_combo_ids(node_rows)
 
     # for checking if empty
-    exist_non_duplicates = tf.logical_not(empty_tensor(non_duplicate_combo_ids))
-    exist_duplicates = tf.logical_not(empty_tensor(duplicate_combo_ids))
+    exist_non_duplicates = tf.logical_not(is_empty_tensor(non_duplicate_combo_ids))
+    exist_duplicates = tf.logical_not(is_empty_tensor(duplicate_combo_ids))
     if not (exist_duplicates and exist_non_duplicates):
-        tf_empty = tf.cast(tf.reshape((), (0)), tf.int64)
+        empty_tensor = tf.cast(tf.reshape((), (0)), tf.int64)
 
     # indices relative to node_rows.flat_values
     # [n_combos, 1]
@@ -630,7 +630,7 @@ def get_combos_to_keep(
             tf.gather(node_adjacencies.flat_values, _non_dup_flat_indices)
         )
     else:
-        non_dup_adjs = tf_empty
+        non_dup_adjs = empty_tensor
 
     if exist_duplicates:
         dup_adjs = tf.gather(node_adjacencies.flat_values, _dup_flat_indices)[..., 0]
@@ -653,17 +653,17 @@ def get_combos_to_keep(
         combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
         adjacencies = tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
     else:
-        dup_adjs = tf_empty
-        _dups_to_keep_idcs = tf_empty
-        combo_ids = tf_empty
-        adjacencies = tf_empty
+        dup_adjs = empty_tensor
+        _dups_to_keep_idcs = empty_tensor
+        combo_ids = empty_tensor
+        adjacencies = empty_tensor
         exist_nodes_to_discard = False
 
     # take non-discarded duplicate values
     combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
     adjacencies = (
-        tf_empty
-        if empty_tensor(dup_adjs)
+        empty_tensor
+        if is_empty_tensor(dup_adjs)
         else tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
     )
 
