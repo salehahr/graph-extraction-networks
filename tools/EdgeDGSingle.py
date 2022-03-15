@@ -320,9 +320,8 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self, node_rows: tf.RaggedTensor, tab_adjacencies: DenseHashTable
     ) -> Tuple[tf.Tensor, tf.Tensor]:
         """Used for nodes for which exactly/less than <degree> number of node combinations are detected."""
-        case_combos = tf.gather(
-            self._combos, data_op.unique(node_rows.flat_values, axis=0)
-        )
+        unique_combo_ids = tf.unique(node_rows.flat_values).y
+        case_combos = tf.gather(self._combos, unique_combo_ids)
         adjacencies = tab_adjacencies[case_combos]
 
         # update lookup table
