@@ -30,9 +30,9 @@ if __name__ == "__main__":
 
     # generate data
     graph_data = get_gedg(data_config, batch_size=1)[TestType.VALIDATION]
-    (skel_img, node_pos, degrees), adj_matr_true = graph_data.get_single_data_point(0)
-    edge_dg = EdgeDGSingle(run_config.num_neighbours, skel_img, node_pos, degrees)
+    edge_dg_input, adj_matr_true, filepath = graph_data.get_single_data_point(0)
+    edge_dg = EdgeDGSingle(run_config.num_neighbours, *edge_dg_input)
 
     # calculate A
     iterate(edge_dg, model)
-    edge_dg.preview(title="$A_\mathrm{\mathsf{end}}$")
+    edge_dg.preview(title=filepath)

@@ -1,5 +1,16 @@
 import os
 import random
+import re
+
+pattern = r"(.*?)\/.*(\d{4}_\d{5}).png"
+
+
+def shorten_filepath(filename: str, data_path) -> str:
+    """Returns short version of the data filepath."""
+    filename = os.path.relpath(filename, start=data_path)
+    match = re.search(pattern, filename)
+    vid_name, img_name = match.groups()
+    return f"{vid_name}: {img_name}"
 
 
 def get_random_video_path(base_path):

@@ -285,7 +285,7 @@ def plot_adj_matr(
     extent = 0, x_lim, 0, y_lim
 
     plt.imshow(img, extent=extent, interpolation="nearest", cmap="gray")
-    plt.title(title)
+    plt.title(title, loc="left")
     nx.draw(
         graph,
         pos=pos_dict,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os.path
 import random
 from abc import ABC
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
@@ -10,6 +11,7 @@ import tensorflow as tf
 from tools import EdgeDGSingle
 from tools import data as data_op
 from tools.adj_matr import transform_adj_matr
+from tools.files import shorten_filepath
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
@@ -99,6 +101,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         # dataset settings
         self.test_type = test_type
         self.shuffle = shuffle
+        self.config = config
 
         if test_type == TestType.TRAINING:
             num_data = config.num_train
@@ -290,19 +293,23 @@ class GraphExtractionDG(DataGenerator):
         else:
             return (skel_imgs, node_pos, degrees), adj_matrs
 
-    def get_single_data_point(self, i: int):
+    def get_single_data_point(self, i: int) -> Tuple[Tuple, tf.RaggedTensor, str]:
         """Returns data for a batch size of one,
         with squeezed dimensions for convenience."""
         assert self.batch_size == 1
 
-        (skel_img, node_pos, degrees), adj_matr_true = self.__getitem__(i)
+        (skel_img, node_pos, degrees), adj_matr_true, filepaths = self.__getitem__(
+            i, return_filepaths=True
+        )
 
         # squeeze [1, 256, 256, 1] to [256, 256, 1]
         skel_img = tf.squeeze(skel_img, axis=0)
         node_pos = tf.squeeze(node_pos, axis=0)
         degrees = tf.squeeze(degrees, axis=0)
 
-        return (skel_img, node_pos, degrees), adj_matr_true
+        filepath = shorten_filepath(filepaths[0], data_path=self.config.data_path)
+
+        return (skel_img, node_pos, degrees), adj_matr_true, filepath
 
     def _to_pos_indices_img(self, node_pos: tf.data.Dataset) -> tf.data.Dataset:
         """Generates an image dataset containing the integer indices
