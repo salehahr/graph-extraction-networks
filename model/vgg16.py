@@ -9,6 +9,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
 from model.utils import double_conv, input_tensor, pooling, single_conv, sum_across
+from tools import timer
 
 
 class VGG16(Model):
@@ -202,3 +203,7 @@ class EdgeNN(VGG16):
             x = pooling(x, dropout_rate=0)
 
         self._conv2_output = x
+
+    @timer
+    def predict(self, *args, **kwargs):
+        return super(EdgeNN, self).predict(*args, **kwargs)
