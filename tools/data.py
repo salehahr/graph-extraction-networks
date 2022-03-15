@@ -321,7 +321,12 @@ def get_node_index(node_xy: tf.Tensor, pos_list: tf.Tensor) -> tf.Tensor:
     return tf.squeeze(tf.where(node_id))
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=None, dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ],
+)
 def get_node_neighbours(node_id: tf.Tensor, combos: tf.Tensor):
     """Returns the node combinations that contain node_id."""
     idx_contains_node = tf.math.reduce_any(tf.equal(combos, node_id), axis=1)
@@ -335,14 +340,18 @@ def get_node_neighbours(node_id: tf.Tensor, combos: tf.Tensor):
     return combo_ids
 
 
-@tf.function
-def distance(n1: tf.Tensor, n2: tf.Tensor, axis=None) -> tf.Tensor:
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ],
+)
+def distance(n1: tf.Tensor, n2: tf.Tensor) -> tf.Tensor:
     """Calculates the distance between two nodes."""
     diff = tf.cast(n1 - n2, tf.float32)
-    return tf.math.reduce_euclidean_norm(diff, axis=axis)
+    return tf.math.reduce_euclidean_norm(diff, axis=1)
 
 
-# @tf.function(experimental_relax_shapes=True)
 def nearest_neighbours(node_id, num_neighbours, all_combos, pos_list):
     """Returns the nearest neighbours of the node at node_id."""
     # length might be < num_neighbours if all_combos has become sparse (due to nodes being discarded)
@@ -355,16 +364,8 @@ def nearest_neighbours(node_id, num_neighbours, all_combos, pos_list):
 
     # get the smallest distance
     combos_p1_xy, combos_p2_xy = combos_xy[:, 0, :], combos_xy[:, 1, :]
-    distances = distance(combos_p1_xy, combos_p2_xy, axis=1)
+    distances = distance(combos_p1_xy, combos_p2_xy)
     _, indices = tf.math.top_k(-1 * distances, k=num_neighbours)
-
-    """
-    neighbours_xy [k, 2, 2]
-        axis 0: all the neighbours corresponding to the node
-        axis 1: neighbour, node
-        axis 2: x-values, y-values
-    """
-    # neighbours_xy = tf.gather(combos_xy, indices)
 
     return tf.gather(combos, indices)
 
@@ -411,15 +412,25 @@ def data_from_node_imgs(
     return pos_list_xy, degrees_list
 
 
-@tf.function
-def unique(tensor: tf.Tensor, axis: int, dtype=tf.int64) -> tf.Tensor:
-    """Since tf.unique is currently for 1D tensors, use this for finding unique values across 2D or more."""
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=None, dtype=tf.int64),
+    ],
+)
+def unique_2d(tensor: tf.Tensor) -> tf.Tensor:
+    """Since tf.unique is currently for 1D tensors,
+    use this for finding unique values across 2D or more."""
     return tf.numpy_function(
-        lambda x: np.unique(x, axis=axis), inp=[tensor], Tout=dtype
+        lambda x: np.unique(x, axis=0), inp=[tensor], Tout=tf.int64
     )
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ]
+)
 def remove_combo_subset(combos: tf.Tensor, subset: tf.Tensor) -> tf.Tensor:
     """
     Given combos of dimension [c, 2] and a subset of it with dimensions [s, 2],
@@ -439,7 +450,12 @@ def remove_combo_subset(combos: tf.Tensor, subset: tf.Tensor) -> tf.Tensor:
     return tf.gather(combos, indices)
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def remove_combos_containing_nodes(combos: tf.Tensor, nodes: tf.Tensor) -> tf.Tensor:
     not_found = tf.map_fn(
         lambda node: tf.not_equal(combos, node),
@@ -452,7 +468,11 @@ def remove_combos_containing_nodes(combos: tf.Tensor, nodes: tf.Tensor) -> tf.Te
     return tf.gather(combos, indices_not_found)
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ],
+)
 def unique_nodes_from_combo(combos: tf.Tensor) -> Tuple[tf.Tensor, tf.RaggedTensor]:
     # flatten combos
     num_elems_combos = tf.reduce_prod(
@@ -470,7 +490,13 @@ def unique_nodes_from_combo(combos: tf.Tensor) -> Tuple[tf.Tensor, tf.RaggedTens
     return nodes, rows_in_combos
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.float32),
+    ],
+)
 def node_adjacencies(
     rows_in_combos: tf.RaggedTensor, adjacencies: tf.Tensor, adjacency_probs: tf.Tensor
 ) -> Tuple[tf.Tensor, tf.RaggedTensor]:
@@ -481,7 +507,15 @@ def node_adjacencies(
     return unique_adjacencies, unique_adj_probs
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None,), dtype=tf.bool),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+    ],
+)
 def adjacency_cases(
     comparison_adj_degrees: tf.bool,
     nodes: tf.Tensor,
@@ -502,7 +536,6 @@ def adjacency_cases(
     return nodes, rows, adjacencies, adjacency_probs
 
 
-@tf.function
 def new_adjacencies(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
     """Returns new adjacency vector with <degree> of the highest probability entries."""
     probs, degree = args[0], args[1]
@@ -515,7 +548,12 @@ def new_adjacencies(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
     return new_adj
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ],
+)
 def get_new_adjacencies(
     node_adj_probs: tf.RaggedTensor, node_degrees: tf.Tensor
 ) -> tf.RaggedTensor:
@@ -574,7 +612,9 @@ def get_rc_ragged(ragged, flat_idx):
     return tf.stack((row, col))
 
 
-@tf.function
+@tf.function(
+    input_signature=[tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1)],
+)
 def check_duplicate_combo_ids(node_rows: tf.RaggedTensor):
     unique_combo_ids, _, counts = tf.unique_with_counts(node_rows.flat_values)
     non_duplicates_ids = tf.gather(unique_combo_ids, tf.where(counts == 1))[:, 0]
@@ -583,7 +623,12 @@ def check_duplicate_combo_ids(node_rows: tf.RaggedTensor):
     return non_duplicates_ids, duplicates_ids
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ],
+)
 def get_indices_of_combos_in_node_rows(
     node_rows: tf.RaggedTensor, combo_ids: tf.Tensor
 ) -> tf.Tensor:
@@ -598,7 +643,7 @@ def get_indices_of_combos_in_node_rows(
         )
 
 
-@tf.function
+@tf.function(input_signature=[tf.TensorSpec(shape=None, dtype=tf.int64)])
 def is_empty_tensor(tensor: tf.Tensor) -> tf.bool:
     return tf.equal(tf.size(tensor), 0)
 
@@ -607,6 +652,9 @@ def get_combos_to_keep(
     combos: tf.Tensor, node_rows: tf.RaggedTensor, node_adjacencies: tf.RaggedTensor
 ):
     non_duplicate_combo_ids, duplicate_combo_ids = check_duplicate_combo_ids(node_rows)
+    # unique_combo_ids, _, counts = tf.unique_with_counts(node_rows.flat_values)
+    # non_duplicate_combo_ids = tf.gather(unique_combo_ids, tf.where(counts == 1))[:, 0]
+    # duplicate_combo_ids = tf.gather(unique_combo_ids, tf.where(counts > 1))[:, 0]
 
     # for checking if empty
     exist_non_duplicates = tf.logical_not(is_empty_tensor(non_duplicate_combo_ids))

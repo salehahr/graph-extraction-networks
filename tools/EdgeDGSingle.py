@@ -84,6 +84,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         """Reduced node combinations limited to the nearest neighbours."""
         self._combos = None
 
+        num_neighbours = tf.constant(num_neighbours, dtype=tf.int32)
         self.num_neighbours = num_neighbours
         self.update_neighbours(num_neighbours)
 
@@ -212,7 +213,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         combos = self._combos[
             i * self.batch_size : i * self.batch_size + self.batch_size
         ]
-        return data_op.unique(combos, axis=0, dtype=tf.int64)
+        return data_op.unique_2d(combos)
 
     def _get_combo_inputs(self, combos: tf.Tensor) -> tf.data.Dataset:
         """Returns the current node combinations the format required by the model for prediction."""

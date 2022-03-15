@@ -19,6 +19,6 @@ def classify(mask: np.ndarray) -> Tuple[np.ndarray, bool]:
     return mask, is_binary
 
 
-@tf.function
+@tf.function(input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.float32)])
 def tf_classify(output: tf.Tensor) -> tf.Tensor:
     return tf.cast(tf.greater(output, tf.constant(0.5)), tf.int64)

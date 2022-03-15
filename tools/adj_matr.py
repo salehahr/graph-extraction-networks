@@ -32,7 +32,13 @@ def np_update_adj_matr(
     return adj_matr
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, None), dtype=tf.uint8),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ],
+)
 def update_adj_matr(
     adj_matr: tf.Tensor, adjacencies: tf.Tensor, pair_ids: tf.Tensor
 ) -> tf.Tensor:
