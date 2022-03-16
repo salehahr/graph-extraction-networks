@@ -456,16 +456,16 @@ def remove_combo_subset(combos: tf.Tensor, subset: tf.Tensor) -> tf.Tensor:
         tf.TensorSpec(shape=(None,), dtype=tf.int64),
     ]
 )
-def remove_combos_containing_nodes(combos: tf.Tensor, nodes: tf.Tensor) -> tf.Tensor:
+def combo_indices_without_nodes(combos: tf.Tensor, nodes: tf.Tensor) -> tf.Tensor:
+    """Returns indices where the nodes are NOT found in combos."""
+    # note: throws error if nodes is an empty Tensor
     not_found = tf.map_fn(
         lambda node: tf.not_equal(combos, node),
         elems=nodes,
         fn_output_signature=tf.bool,
     )
 
-    indices_not_found = tf.where(tf.reduce_all(not_found, axis=[0, 2]))[:, 0]
-
-    return tf.gather(combos, indices_not_found)
+    return tf.where(tf.reduce_all(not_found, axis=[0, 2]))[:, 0]
 
 
 @tf.function(
@@ -516,7 +516,7 @@ def node_adjacencies(
         tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
     ],
 )
-def adjacency_cases(
+def filter_nodes_by_case(
     comparison_adj_degrees: tf.bool,
     nodes: tf.Tensor,
     rows: tf.RaggedTensor,

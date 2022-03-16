@@ -147,7 +147,10 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             combos = data_op.remove_combo_subset(combos, combos_to_remove)
 
         # exclude found nodes to give combos containing nodes that have not been found yet
-        combos = data_op.remove_combos_containing_nodes(combos, self.nodes_found)
+        not_found_indices = data_op.combo_indices_without_nodes(
+            combos, self.nodes_found
+        )
+        combos = tf.gather(combos, not_found_indices)
 
         return combos
 
@@ -236,6 +239,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             adjacencies = tab_adjacencies[self._combos]
 
             # get list of nodes, without duplicates, which are contained in the neighbours node combinataions.
+            # node_rows is relative to self._combos
             nodes, node_rows = data_op.unique_nodes_from_combo(self._combos)
             node_adjacencies, node_adj_probs = data_op.node_adjacencies(
                 node_rows, adjacencies, adjacency_probs
@@ -256,7 +260,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
                 node_rows,
                 node_adjacencies,
                 node_adj_probs,
-            ) = data_op.adjacency_cases(
+            ) = data_op.filter_nodes_by_case(
                 comparison, nodes, node_rows, node_adjacencies, node_adj_probs
             )
             node_degrees = self.tab_N_degrees[nodes]
@@ -286,6 +290,15 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
             if data_op.is_empty_tensor(case_combos):
                 continue
 
+            # decrease degrees of nodes in the combos -- once degrees reaches 0, the node is 'found'
+            # noinspection PyUnreachableCode
+            if __debug__:
+                degrees_difference = node_degrees - node_adjacencies
+                check_degree_differences(case, degrees_difference)
+            case_combos, adjacencies = self._update_found_nodes(
+                case_combos, adjacencies
+            )
+
             # update adjacency matrix
             self._update_adj_matr(case_combos, adjacencies)
             # noinspection PyUnreachableCode
@@ -296,10 +309,6 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
                     combos=case_combos,
                     adjacencies=adjacencies,
                 )
-
-            # decrease degrees of nodes in the combos -- once degrees reaches 0, the node is 'found'
-            degrees_difference = node_degrees - node_adjacencies
-            self._update_found_nodes(case, nodes, degrees_difference)
 
             # remove case_combos (combos where adj has just been set),
             # as well as combos containing found nodes,
@@ -361,11 +370,39 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         return case_combos, adjacencies, node_adjacencies
 
     def _update_found_nodes(
-        self, case: AdjClassification, nodes: tf.Tensor, degrees: tf.Tensor
-    ) -> None:
+        self, case_combos: tf.Tensor, adjacencies: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
         """Updates degrees table with the new degrees. Found nodes are updated with an 0."""
-        check_degree_differences(case, degrees)
-        self.tab_N_degrees.insert(nodes, degrees)
+        nodes, node_rows = data_op.unique_nodes_from_combo(case_combos)
+        node_adjacencies = tf.reduce_sum(tf.gather(adjacencies, node_rows), axis=1)
+
+        # new_degrees might be < 0!
+        # e.g. for combinations [a, b], [a, c] with predicted adjacencies 1 each
+        # if, currently, deg(a) = 1, deg(b) = 1 and deg(c) = 1
+        # then new_deg(a) = -1
+        old_degrees = self.tab_N_degrees[nodes]
+        new_degrees = old_degrees - node_adjacencies
+
+        bad_nodes_exist = tf.reduce_any(tf.less(new_degrees, 0))
+
+        # remove bad nodes accordingly
+        if bad_nodes_exist:
+            bad_nodes = tf.gather(nodes, tf.where(new_degrees < 0)[:, 0])
+
+            not_found_indices = data_op.combo_indices_without_nodes(
+                case_combos, bad_nodes
+            )
+            case_combos = tf.gather(case_combos, not_found_indices)
+            adjacencies = tf.gather(adjacencies, not_found_indices)
+
+            nodes, node_rows = data_op.unique_nodes_from_combo(case_combos)
+            node_adjacencies = tf.reduce_sum(tf.gather(adjacencies, node_rows), axis=1)
+
+            old_degrees = self.tab_N_degrees[nodes]
+
+        self.tab_N_degrees.insert(nodes, old_degrees - node_adjacencies)
+
+        return case_combos, adjacencies
 
     def _get_batch_lookup_tables(
         self, model: EdgeNN
