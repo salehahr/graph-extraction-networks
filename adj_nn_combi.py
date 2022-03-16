@@ -32,6 +32,7 @@ if __name__ == "__main__":
     graph_data = get_gedg(data_config, batch_size=1)[TestType.VALIDATION]
     edge_dg_input, adj_matr_true, filepath = graph_data.get_single_data_point(0)
     edge_dg = EdgeDGSingle(run_config.num_neighbours, *edge_dg_input)
+    print(filepath)
 
     # calculate A
     iterate(edge_dg, model)
