@@ -1,11 +1,12 @@
 import os
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 
 from tools.PolyGraph import PolyGraph
 from tools.sort import get_sort_indices, sort_list_of_nodes
+from tools.TestType import TestType
 
 
 def get_skeletonised_ds(
@@ -193,7 +194,11 @@ def get_all_node_combinations(num_nodes: tf.Tensor) -> tf.Tensor:
 
 
 def get_reduced_node_combinations(
-    all_combos: tf.Tensor, adj_matr: tf.Tensor, shuffle: bool = True
+    all_combos: tf.Tensor,
+    adj_matr: tf.Tensor,
+    shuffle: bool = True,
+    test_type: TestType = TestType.TRAINING,
+    adjacency_fraction: Optional[float] = None,
 ) -> tf.Tensor:
     """Returns a dataset of node combinations that have equal amounts of
     adjacent and non-adjacent node pairs. The dataset elements are
@@ -202,18 +207,38 @@ def get_reduced_node_combinations(
 
     # categorise according to adjacency
     adj_combos = [pair for (pair, adj) in adjacencies if adj == 1]
-    not_adj_combos = [pair for (pair, adj) in adjacencies if adj == 0]
+    non_adj_combos = [pair for (pair, adj) in adjacencies if adj == 0]
 
     if shuffle is True:
         np.random.shuffle(adj_combos)
-        np.random.shuffle(not_adj_combos)
+        np.random.shuffle(non_adj_combos)
 
-    # zip + nested list comprehension = interleaving while cutting off excess non_adj_nodes
-    reduced_combos = [
-        node
-        for adj_and_non_adj in zip(adj_combos, not_adj_combos)
-        for node in adj_and_non_adj
-    ]
+    # training ds: 1 to 1 ratio of adjacent and non-adjacent nodes
+    if (
+        test_type == TestType.TRAINING
+        or adjacency_fraction is None
+        or adjacency_fraction == 0.5
+    ):
+        # zip + nested list comprehension = interleaving while cutting off excess non_adj_nodes
+        reduced_combos = [
+            node
+            for adj_and_non_adj in zip(adj_combos, non_adj_combos)
+            for node in adj_and_non_adj
+        ]
+    else:
+        num_combos = len(adjacencies)
+        num_adj_soll = int(adjacency_fraction * num_combos)
+
+        # too few adjacencies
+        if len(adj_combos) < num_adj_soll:
+            num_adj = len(adj_combos)
+            num_combos = num_adj / adjacency_fraction
+        else:
+            num_adj = num_adj_soll
+        num_non_adj = int((1 - adjacency_fraction) * num_combos)
+
+        reduced_combos = adj_combos[:num_adj] + non_adj_combos[:num_non_adj]
+        np.random.shuffle(reduced_combos)
 
     return tf.stack(reduced_combos)
 

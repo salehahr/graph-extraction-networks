@@ -49,6 +49,8 @@ class Config(BaseModel):
     save_path: str
 
     validation_fraction: float
+    adjacency_fraction: float
+
     use_small_dataset: bool = False
     max_files: Optional[int] = None
 
@@ -149,6 +151,7 @@ class RunParams(BaseModel):
     batch_size: Optional[int] = None
 
     # for EdgeNN specifically
+    adjacency_frac: Optional[int] = None
     node_pairs_in_batch: Optional[int] = None
     n_filters: Optional[int] = None
     n_conv2_blocks: Optional[int] = None
@@ -225,6 +228,9 @@ class RunConfig(BaseModel):
 
             if self.parameters.train_imgs is None:
                 self.parameters.train_imgs = data_config.num_train
+
+            if self.parameters.adjacency_frac is None:
+                self.parameters.adjacency_frac = data_config.adjacency_fraction
 
     @property
     def images_in_batch(self) -> int:

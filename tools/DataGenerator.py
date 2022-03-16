@@ -468,7 +468,11 @@ class EdgeDG(GraphExtractionDG):
         # shuffle before batching -- todo: set seed for np.random
         combos = data_op.get_all_node_combinations(num_nodes)
         combos = data_op.get_reduced_node_combinations(
-            combos, adj_matr, shuffle=self.shuffle
+            combos,
+            adj_matr,
+            shuffle=self.shuffle,
+            test_type=self.test_type,
+            adjacency_fraction=self.config.adjacency_fraction,
         )
         return combos
 

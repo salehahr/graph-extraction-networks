@@ -1,0 +1,25 @@
+project: edge_extraction
+entity: salehah
+
+
+# run details
+run_name: b3_L_RA
+resume: true
+run_id: 1m3yxeop
+run_type: training
+
+
+parameters:
+  # training params
+  optimiser: radam
+  train_imgs: 2000
+  epochs: 50
+  learning_rate: 1e-3
+  batch_size: 8
+  node_pairs_in_batch: 4
+  # model params
+  n_filters: 6
+  n_conv2_blocks: 2
+  n_conv3_blocks: 2
+
+sweep_config: null
