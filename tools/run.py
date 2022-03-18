@@ -60,16 +60,31 @@ def start(
     return run_
 
 
-def sweep(run_config: RunConfig, train_func: Callable, count: int):
+def sweep(
+    run_config: RunConfig,
+    train_func: Callable,
+    count: Optional[int] = None,
+    sweep_id: Optional[str] = None,
+):
     # configure the sweep
-    sweep_id = wandb.sweep(
-        run_config.sweep_config,
-        entity=run_config.entity,
-        project=run_config.project,
+    sweep_id = (
+        wandb.sweep(
+            run_config.sweep_config,
+            entity=run_config.entity,
+            project=run_config.project,
+        )
+        if sweep_id is None
+        else sweep_id
     )
 
     # run the sweep
-    wandb.agent(sweep_id, train_func, count=count)
+    wandb.agent(
+        sweep_id,
+        train_func,
+        count=count,
+        entity=run_config.entity,
+        project=run_config.project,
+    )
 
 
 def load_model(

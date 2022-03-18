@@ -27,11 +27,25 @@ parameters:
 
 
 sweep_config:
-  name: optimiser
+  name: tuning
   method: random
   metric:
-    name: accuracy
+    name: val_precision
     goal: maximize
   parameters:
-    optimizer:
-      values: ["adam", "nadam", "sgd"]
+    optimiser:
+      value: radam
+    learning_rate:
+      value: 1e-3
+    epochs:
+      value: 2
+    batch_size:
+      value: 2
+    node_pairs_in_batch:
+      value: 2
+    n_filters:
+      values: [2, 3, 4]
+    n_conv2_blocks:
+      values: [1, 2, 3]
+    n_conv3_blocks:
+      values: [1, 2, 3]

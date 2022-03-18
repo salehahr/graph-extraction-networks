@@ -75,3 +75,16 @@ class TestEdgeNN(unittest.TestCase):
             self.model, edge_data, validate=validate, debug=debug, predict_frequency=2
         )
         run.end()
+
+    def test_sweep(self):
+        sweep_id = "7dvdz8dt"
+        run.sweep(self.run_config, self._train_for_sweep, count=5, sweep_id=sweep_id)
+
+    def _train_for_sweep(self):
+        run.start(self.run_config, is_sweep=True)
+        short_training_run = True
+
+        model = run.load_model(self.config, self.run_config, do_sweep=True)
+
+        run.train(model, self.edge_data, debug=short_training_run, predict_frequency=2)
+        run.end()
