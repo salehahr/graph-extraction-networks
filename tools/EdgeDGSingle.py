@@ -223,7 +223,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         combos_xy = tf.gather(self.pos_list_xy, combos)
         return data_op.get_combo_inputs(self.skel_img, self.node_pos, combos_xy)
 
-    def update_adjacencies(self, i: int, model: EdgeNN) -> None:
+    def update_adjacencies(self, model: EdgeNN, i: int = 0) -> None:
         # current batch of nearest neighbour node combinations.
         # volatile: this gets overwritten in the for loop below
         self._combos = self._get_unique_combos_in_batch(i)

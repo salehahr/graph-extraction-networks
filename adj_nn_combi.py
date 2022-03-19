@@ -5,14 +5,10 @@ from tools import EdgeDGSingle, TestType, get_gedg, run, timer
 def iterate(data_generator, model_):
     iteration = 0
     while not data_generator.checked_all_nodes and data_generator.num_combos > 0:
-        # todo: calculate batch size
-
-        # loop over all nearest neighbour combinations
-        for i in range(len(data_generator)):
-            data_generator.update_adjacencies(i, model_)
-            # noinspection PyUnreachableCode
-            if __debug__:
-                edge_dg.preview(title=f"$A_{iteration}$")
+        data_generator.update_adjacencies(model_)
+        # noinspection PyUnreachableCode
+        if __debug__:
+            edge_dg.preview(title=f"$A_{iteration}$")
 
         num_neighbours = data_generator.num_neighbours * 2
         data_generator.update_neighbours(num_neighbours)
