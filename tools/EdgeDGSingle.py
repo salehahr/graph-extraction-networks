@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 import tensorflow as tf
 
+import tools.combinations
+import tools.neighbours
 from tools import data as data_op
 from tools import plots, tables
-from tools.adj_matr import update_adj_matr
 from tools.timer import timer
 
 if TYPE_CHECKING:
@@ -60,8 +61,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         derived_data = data_op.data_from_node_imgs(node_pos, degrees)
         self.pos_list_xy = derived_data[0]
         self.degrees_list = derived_data[1]
-
-        self.num_nodes = tf.shape(self.pos_list_xy)[0]
+        self.num_nodes = derived_data[2]
         self.all_nodes = tf.range(0, self.num_nodes, dtype=tf.int64)
 
         # placeholder
@@ -109,45 +109,22 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         """Increases number of radius to search for and finds the corresponding
         node combinations."""
         self.num_neighbours = num_neighbours
-        self._combos = self._get_neighbours()
-
-    def _get_neighbours(self) -> Tuple[tf.Tensor, tf.Tensor]:
-        """Obtains k nearest neighbours from the available node combinations."""
-        # make RaggedTensors to deal with cases when there are not enough neighbours
-        combos = tf.map_fn(
-            lambda x: data_op.nearest_neighbours(
-                x, self.num_neighbours, self._reduced_combos, self.pos_list_xy
-            ),
-            elems=self.nodes_not_found_yet,
-            fn_output_signature=tf.RaggedTensorSpec(
-                shape=[None, 2], ragged_rank=0, dtype=tf.int64
-            ),
+        self._combos = tools.neighbours.get_neighbours(
+            self.num_neighbours,
+            self._reduced_combos,
+            self.pos_list_xy,
+            self.nodes_not_found_yet,
         )
-        # combos = tf.concat(tf.unstack(combos, axis=1), axis=0)
-        combos = combos.flat_values
-
-        # flatten [n_nodes], [n_neighbours] -> [n_nodes x n_neighbours]
-        # num_elems = tf.reduce_prod(tf.shape(combos)[0:2])
-        # combos = tf.stack(tf.reshape(combos, (num_elems, 2)), axis=0)
-        # combos_xy = tf.stack(tf.reshape(combos_xy, (num_elems, 2, 2)), axis=0)
-
-        """
-        combos [n_nodes, n_neighbours, 2(p1, p2)]
-            combos[0] = ids of n_neighbours pairs
-        combos_xy [n_nodes, n_neighbours, 2(p1, p2), 2(x, y)]
-        """
-
-        return combos
 
     def _update_combos(
         self, combos: tf.Tensor, combos_to_remove: Optional[tf.Tensor] = None
     ) -> tf.Tensor:
         # combos: combinations where adjacencies have just been set
         if combos_to_remove is not None:
-            combos = data_op.remove_combo_subset(combos, combos_to_remove)
+            combos = tools.combinations.remove_combo_subset(combos, combos_to_remove)
 
         # exclude found nodes to give combos containing nodes that have not been found yet
-        not_found_indices = data_op.combo_indices_without_nodes(
+        not_found_indices = tools.combinations.combo_indices_without_nodes(
             combos, self.nodes_found
         )
         combos = tf.gather(combos, not_found_indices)
@@ -175,7 +152,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     @property
     def nodes_not_found_yet(self) -> tf.Tensor:
         """List of nodes for which not enough edges have been found yet."""
-        return tf.where(self.all_degrees_n != 0)[:, 0]
+        return tf.where(self.all_degrees_n != 0)
 
     @property
     def checked_all_nodes(self) -> tf.bool:
@@ -235,8 +212,8 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
 
             # get list of nodes, without duplicates, which are contained in the neighbours node combinataions.
             # node_rows is relative to self._combos
-            nodes, node_rows = data_op.unique_nodes_from_combo(self._combos)
-            node_adjacencies, node_adj_probs = data_op.node_adjacencies(
+            nodes, node_rows = tools.combinations.unique_nodes_from_combo(self._combos)
+            node_adjacencies, node_adj_probs = tools.combinations.node_adjacencies(
                 node_rows, adjacencies, adjacency_probs
             )
             node_degrees = self.tab_N_degrees[nodes]
@@ -255,7 +232,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
                 node_rows,
                 node_adjacencies,
                 node_adj_probs,
-            ) = data_op.filter_nodes_by_case(
+            ) = tools.combinations.filter_nodes_by_case(
                 comparison, nodes, node_rows, node_adjacencies, node_adj_probs
             )
             node_degrees = self.tab_N_degrees[nodes]
@@ -350,12 +327,16 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         Only after this does the adjacencies table get updated.
         """
         # cap adjacencies based on degree
-        node_adjacencies_capped = data_op.get_new_adjacencies(
+        node_adjacencies_capped = tools.combinations.get_new_adjacencies(
             node_adj_probs, node_degrees
         )
 
         # select which combos to proceed with (discard if duplicate values are problematic)
-        case_combos, adjacencies, node_adjacencies = data_op.get_combos_to_keep(
+        (
+            case_combos,
+            adjacencies,
+            node_adjacencies,
+        ) = tools.combinations.get_combos_to_keep(
             self._combos, node_rows, node_adjacencies_capped
         )
 
@@ -368,7 +349,7 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self, case_combos: tf.Tensor, adjacencies: tf.Tensor
     ) -> Tuple[tf.Tensor, tf.Tensor]:
         """Updates degrees table with the new degrees. Found nodes are updated with an 0."""
-        nodes, node_rows = data_op.unique_nodes_from_combo(case_combos)
+        nodes, node_rows = tools.combinations.unique_nodes_from_combo(case_combos)
         node_adjacencies = tf.reduce_sum(tf.gather(adjacencies, node_rows), axis=1)
 
         # new_degrees might be < 0!
@@ -384,13 +365,13 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         if bad_nodes_exist:
             bad_nodes = tf.gather(nodes, tf.where(new_degrees < 0)[:, 0])
 
-            not_found_indices = data_op.combo_indices_without_nodes(
+            not_found_indices = tools.combinations.combo_indices_without_nodes(
                 case_combos, bad_nodes
             )
             case_combos = tf.gather(case_combos, not_found_indices)
             adjacencies = tf.gather(adjacencies, not_found_indices)
 
-            nodes, node_rows = data_op.unique_nodes_from_combo(case_combos)
+            nodes, node_rows = tools.combinations.unique_nodes_from_combo(case_combos)
             node_adjacencies = tf.reduce_sum(tf.gather(adjacencies, node_rows), axis=1)
 
             old_degrees = self.tab_N_degrees[nodes]
@@ -414,7 +395,8 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def _update_adj_matr(self, combos: tf.Tensor, adjacencies: tf.Tensor) -> None:
         """Updates the stored adjacency matrix with the given node pair combinations and their
         corresponding adjacencies."""
-        self.adj_matr = update_adj_matr(self.adj_matr, adjacencies, combos)
+        # self.adj_matr = update_adj_matr(self.adj_matr, adjacencies, combos)
+        pass
 
     def preview(
         self,
@@ -428,7 +410,8 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         # pnly preview the most recent change to the adjacency matrix
         if blank:
             adj_matr = tf.zeros((self.num_nodes, self.num_nodes), dtype=tf.uint8)
-            adj_matr = update_adj_matr(adj_matr, adjacencies, combos).numpy()
+            # adj_matr = update_adj_matr(adj_matr, adjacencies, combos).numpy()
+            pass
         # preview the complete adjacency matrix
         else:
             if adjacencies is not None and combos is not None:

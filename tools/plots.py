@@ -255,7 +255,7 @@ def _lighten_skel_img(img_skel: np.ndarray, black_to_grey: float = 0.7) -> np.nd
     img[ids[:, 0], ids[:, 1]] = np.mean([1 - black_to_grey, 1 / black_to_grey])
 
     cmap = plt.get_cmap("gray")
-    return cmap(img)
+    return np.squeeze(cmap(img))
 
 
 def plot_adj_matr(
@@ -281,7 +281,7 @@ def plot_adj_matr(
     graph = nx.from_numpy_array(adjacency)
     nx.set_node_attributes(graph, pos_dict, "pos")
 
-    y_lim, x_lim = img.shape if img.ndim == 2 else img.shape[:-1]
+    y_lim, x_lim = img.shape if img.ndim == 2 else img.shape[0:2]
     extent = 0, x_lim, 0, y_lim
 
     plt.imshow(img, extent=extent, interpolation="nearest", cmap="gray")

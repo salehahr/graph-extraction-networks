@@ -1,5 +1,9 @@
+from typing import Optional, Tuple
+
 import numpy as np
 import tensorflow as tf
+
+from tools.plots import plot_adj_matr
 
 
 def transform_A(A: np.ndarray, new_indices: np.ndarray) -> np.ndarray:
@@ -24,25 +28,44 @@ def adj_matr_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
-def np_update_adj_matr(
-    adj_matr: np.ndarray, ids: np.ndarray, adjacencies: np.ndarray
-) -> np.ndarray:
-    """Only produces the upper right triangle."""
-    adj_matr[ids[:, 0], ids[:, 1]] = adjacencies
-    return adj_matr
+@tf.function
+def _update(combos: tf.Tensor, adjacencies: tf.Tensor, A: tf.Variable):
+    A.scatter_nd_update(combos, adjacencies)
+    A.scatter_nd_update(tf.reverse(combos, axis=[-1]), adjacencies)
 
 
-@tf.function(
-    input_signature=[
-        tf.TensorSpec(shape=(None, None), dtype=tf.uint8),
-        tf.TensorSpec(shape=(None,), dtype=tf.int64),
-        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
-    ],
-)
-def update_adj_matr(
-    adj_matr: tf.Tensor, adjacencies: tf.Tensor, pair_ids: tf.Tensor
-) -> tf.Tensor:
-    upper_tri = tf.numpy_function(
-        np_update_adj_matr, inp=(adj_matr, pair_ids, adjacencies), Tout=tf.uint8
+def get_update_function(A: tf.Variable) -> tf.types.experimental.ConcreteFunction:
+    return _update.get_concrete_function(
+        combos=tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        adjacencies=tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        A=A,
     )
-    return upper_tri + tf.transpose(upper_tri)
+
+
+def get_placeholders(
+    all_combos: tf.Tensor, degrees_list: tf.Tensor, num_nodes: tf.Tensor
+) -> Tuple[tf.Variable, tf.Variable, tf.Variable]:
+    adjacencies_var = tf.Variable(
+        initial_value=tf.repeat(
+            tf.constant(-1, dtype=tf.int64), repeats=tf.shape(all_combos)[0]
+        ),
+        trainable=False,
+    )
+    degrees_var = tf.Variable(initial_value=degrees_list, trainable=False)
+    A = tf.Variable(
+        initial_value=tf.zeros((num_nodes, num_nodes), dtype=tf.int64),
+        trainable=False,
+    )
+
+    return adjacencies_var, degrees_var, A
+
+
+def preview(
+    adj_matr: tf.Variable,
+    skel_img: tf.Tensor,
+    pos_list_xy: tf.Tensor,
+    title: Optional[str] = None,
+):
+    plot_adj_matr(
+        skel_img.numpy(), pos_list_xy.numpy(), adj_matr.value().numpy(), title=title
+    )

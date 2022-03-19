@@ -120,7 +120,7 @@ class VGG16(Model):
 
     def build(self, **kwargs):
         self.recompile(**kwargs)
-        self.summary()
+        # self.summary()
 
     def recompile(self, **kwargs):
         metrics = [
@@ -179,8 +179,9 @@ class EdgeNN(VGG16):
             optimiser,
         )
 
-    @timer
+    @tf.function
     def __call__(self, *args, **kwargs):
+        print("tracing EdgeNN.__call__ ...")
         return super(EdgeNN, self).__call__(*args, **kwargs)
 
     @timer
