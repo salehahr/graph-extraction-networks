@@ -23,7 +23,10 @@ GraphBatchDatasets = Tuple[tf.data.Dataset, ...]
 
 
 def get_gedg(
-    config: Config, batch_size: Optional[int] = None, augmented: bool = True
+    config: Config,
+    batch_size: Optional[int] = None,
+    augmented: bool = True,
+    shuffle: bool = True,
 ) -> Dict[TestType, GraphExtractionDG]:
     g_network = config.network.graph_extraction
     orig_batch_size = config.batch_size
@@ -32,7 +35,9 @@ def get_gedg(
         config.batch_size = batch_size
 
     graph_data = {
-        test: GraphExtractionDG(config, g_network, test, augmented=augmented)
+        test: GraphExtractionDG(
+            config, g_network, test, augmented=augmented, shuffle=shuffle
+        )
         for test in TestType
     }
 
