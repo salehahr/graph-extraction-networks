@@ -11,7 +11,7 @@ run_type: training
 
 pretrained_weights: edgenn_vgg-large_epoch018.h5
 search_radius: 50
-num_neighbours: 16
+num_neighbours: 8
 
 parameters:
   # training params

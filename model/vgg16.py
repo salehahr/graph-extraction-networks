@@ -9,7 +9,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
 from model.utils import double_conv, input_tensor, pooling, single_conv, sum_across
-from tools import timer
+from tools.timer import timer
 
 
 class VGG16(Model):
@@ -139,6 +139,7 @@ class VGG16(Model):
             optimizer=Adam(learning_rate=self.learning_rate),
             loss="binary_crossentropy",
             metrics=metrics,
+            run_eagerly=False,
             **kwargs,
         )
 
@@ -178,6 +179,14 @@ class EdgeNN(VGG16):
             optimiser,
         )
 
+    @timer
+    def __call__(self, *args, **kwargs):
+        return super(EdgeNN, self).__call__(*args, **kwargs)
+
+    @timer
+    def predict(self, *args, **kwargs):
+        return super(EdgeNN, self).predict(*args, **kwargs)
+
     def _build_layers(self, input_size):
         self._set_input(input_size)
         self._set_conv2_blocks()
@@ -215,7 +224,3 @@ class EdgeNN(VGG16):
             x = pooling(x, dropout_rate=0)
 
         self._conv2_output = x
-
-    @timer
-    def predict(self, *args, **kwargs):
-        return super(EdgeNN, self).predict(*args, **kwargs)

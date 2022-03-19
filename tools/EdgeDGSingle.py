@@ -8,7 +8,7 @@ import tensorflow as tf
 from tools import data as data_op
 from tools import plots, tables
 from tools.adj_matr import update_adj_matr
-from tools.postprocessing import tf_classify
+from tools.timer import timer
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
@@ -208,25 +208,20 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
     def __getitem__(self, i: int) -> tf.data.Dataset:
         """Gets batch of nearest neighbour combinations in [x, y] coordinates,
         converts it to the necessary format that EdgeNN expects."""
-        combos = self._get_unique_combos_in_batch(i)
-        return self._get_combo_inputs(combos)
+        self._combos = data_op.unique_combos_in_batch(
+            self._combos, tf.constant(self.batch_size), tf.constant(i)
+        )
+        return data_op.get_combo_inputs(
+            self.skel_img, self.node_pos, self._combos, self.pos_list_xy
+        )
 
-    def _get_unique_combos_in_batch(self, i: int) -> tf.Tensor:
-        """Gets nearest neighbour combinations, without duplicates"""
-        combos = self._combos[
-            i * self.batch_size : i * self.batch_size + self.batch_size
-        ]
-        return data_op.unique_2d(combos)
-
-    def _get_combo_inputs(self, combos: tf.Tensor) -> tf.data.Dataset:
-        """Returns the current node combinations the format required by the model for prediction."""
-        combos_xy = tf.gather(self.pos_list_xy, combos)
-        return data_op.get_combo_inputs(self.skel_img, self.node_pos, combos_xy)
-
+    @timer
     def update_adjacencies(self, model: EdgeNN, i: int = 0) -> None:
         # current batch of nearest neighbour node combinations.
         # volatile: this gets overwritten in the for loop below
-        self._combos = self._get_unique_combos_in_batch(i)
+        self._combos = data_op.unique_combos_in_batch(
+            self._combos, tf.constant(self.batch_size), tf.constant(i)
+        )
 
         # these lookup tables are for easy getting of values later on
         tab_adjacency_probs, tab_adjacencies = self._get_batch_lookup_tables(model)
@@ -408,22 +403,13 @@ class EdgeDGSingle(tf.keras.utils.Sequence):
         self, model: EdgeNN
     ) -> Tuple[DenseHashTable, DenseHashTable]:
         """Performs prediction on batch and generate adjacency lookups."""
-        adjacency_probs, adjacencies = self._get_predictions(model, self._combos)
+        adjacency_probs, adjacencies = data_op.get_predictions(
+            model, self._combos, self.skel_img, self.node_pos, self.pos_list_xy
+        )
         tab_adjacency_probs, tab_adjacencies = tables.combo_lookup_tables(
             self._combos, adjacency_probs, adjacencies
         )
         return tab_adjacency_probs, tab_adjacencies
-
-    def _get_predictions(
-        self, model: EdgeNN, combos: tf.Tensor
-    ) -> Tuple[tf.Tensor, tf.Tensor]:
-        """Performs model prediction on current batch of node combinations."""
-        current_batch = self._get_combo_inputs(combos)
-
-        adjacency_probs = tf.squeeze(tf.constant(model.predict(current_batch)))
-        adjacencies = tf_classify(adjacency_probs)
-
-        return adjacency_probs, adjacencies
 
     def _update_adj_matr(self, combos: tf.Tensor, adjacencies: tf.Tensor) -> None:
         """Updates the stored adjacency matrix with the given node pair combinations and their

@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 import os
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 
 from tools.PolyGraph import PolyGraph
+from tools.postprocessing import tf_classify
 from tools.sort import get_sort_indices, sort_list_of_nodes
 from tools.TestType import TestType
+from tools.timer import timer
+
+if TYPE_CHECKING:
+    from model import EdgeNN
 
 
 def get_skeletonised_ds(
@@ -275,17 +282,32 @@ def get_combo_imgs_from_xy(
     combos_xy: tf.Tensor,
     img_dims: tf.Tensor,
 ) -> tf.data.Dataset:
-    ds = tf.data.Dataset.from_tensor_slices(combos_xy).map(
-        lambda x: (x[0], x[1], img_dims)
+    combos_rc = tf.reverse(combos_xy, axis=[-1])
+    ds = tf.data.Dataset.from_tensor_slices(combos_rc)
+    return ds.map(
+        lambda x: tf.numpy_function(
+            rc_to_node_combo_img, inp=(x[0], x[1], img_dims), Tout=tf.int64
+        )
     )
-    return ds.map(tf_xy_to_node_combo_img)
 
 
-@tf.function
+@timer
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(256, 256), dtype=tf.float32),
+        tf.TensorSpec(shape=(256, 256), dtype=tf.uint8),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+    ],
+)
 def get_combo_inputs(
-    skel_img: tf.Tensor, node_pos_img: tf.Tensor, combos_xy: tf.Tensor
+    skel_img: tf.Tensor,
+    node_pos_img: tf.Tensor,
+    combos: tf.Tensor,
+    pos_list_xy: tf.Tensor,
 ) -> tf.data.Dataset:
-    img_dims = skel_img.shape
+    img_dims = tf.shape(skel_img)
+    combos_xy = tf.gather(pos_list_xy, combos)
     combo_imgs = get_combo_imgs_from_xy(combos_xy, img_dims)
     num_neighbours = tf.cast(tf.shape(combos_xy)[0], tf.int64)
 
@@ -448,6 +470,21 @@ def unique_2d(tensor: tf.Tensor) -> tf.Tensor:
     return tf.numpy_function(
         lambda x: np.unique(x, axis=0), inp=[tensor], Tout=tf.int64
     )
+
+
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=None, dtype=tf.int32),
+        tf.TensorSpec(shape=None, dtype=tf.int32),
+    ],
+)
+def unique_combos_in_batch(
+    combos: tf.Tensor, batch_size: tf.Tensor, i: tf.Tensor
+) -> tf.Tensor:
+    """Gets nearest neighbour combinations, without duplicates"""
+    batch_combos = combos[i * batch_size : i * batch_size + batch_size]
+    return unique_2d(batch_combos)
 
 
 @tf.function(
@@ -776,3 +813,45 @@ def get_combos_to_keep(
     node_adjacencies_sum = tf.reduce_sum(node_adjacencies_new, axis=1)
 
     return combos_to_keep, tf.cast(adjacencies, tf.int64), node_adjacencies_sum
+
+
+@timer
+@tf.function(input_signature=[tf.TensorSpec(shape=(None, 1), dtype=tf.float32)])
+def classify(probs: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    adjacency_probs = tf.squeeze(probs)
+    adjacencies = tf_classify(adjacency_probs)
+    return adjacency_probs, adjacencies
+
+
+def call(model: EdgeNN, data: Tuple[tf.Tensor, tf.Tensor, tf.Tensor]) -> tf.Tensor:
+    """Note: retracing happens regardless of input signature -- makes model.__call__ take longer."""
+    tf_func = tf.function(
+        func=model.__call__,
+        # input_signature=[
+        #     [
+        #         tf.TensorSpec(shape=(None, 256, 256), dtype=tf.float32),
+        #         tf.TensorSpec(shape=(None, 256, 256), dtype=tf.uint8),
+        #         tf.TensorSpec(shape=(None, 256, 256), dtype=tf.int64),
+        #     ],
+        # ],
+        experimental_relax_shapes=True,
+    )
+    return tf_func(data)
+
+
+@timer
+def get_predictions(
+    model: EdgeNN,
+    combos: tf.Tensor,
+    skel_img: tf.Tensor,
+    node_pos: tf.Tensor,
+    pos_list_xy: tf.Tensor,
+) -> Tuple[tf.Tensor, tf.Tensor]:
+    """Performs model prediction on current batch of node combinations."""
+    current_batch = get_combo_inputs(skel_img, node_pos, combos, pos_list_xy)
+    probabilities = tf.constant(
+        model.predict(current_batch)
+    )  # better for large batches
+    # probabilities = tf.constant(model.predict_on_batch(current_batch))
+    # probabilities = model(current_batch, training=False)  # better for smaller batches
+    return classify(probabilities)

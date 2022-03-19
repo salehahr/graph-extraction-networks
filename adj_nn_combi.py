@@ -1,4 +1,8 @@
+import tensorflow as tf
+
 from tools import EdgeDGSingle, TestType, get_gedg, run, timer
+
+tf.config.run_functions_eagerly(False)
 
 
 @timer
@@ -31,5 +35,6 @@ if __name__ == "__main__":
     print(filepath)
 
     # calculate A
+    print("-------Start iteration-----")
     iterate(edge_dg, model)
     edge_dg.preview(title=filepath)
