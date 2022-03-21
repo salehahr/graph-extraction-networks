@@ -182,7 +182,7 @@ class AdjMatrPredictor:
         Then updates the lookup tables and remove the found combinations and nodes
         from the placeholder lists of nodes and combinations.
         """
-        case_combos, case_adj, nodes_found = combination_op.predict_ok_good(
+        case_combos, case_adj = combination_op.predict_ok_good(
             self._nodes,
             self._node_rows,
             self._node_adjacencies,
@@ -193,6 +193,7 @@ class AdjMatrPredictor:
             self._adjacencies_lookup,
             self._degrees_lookup,
         )
+        nodes_found = combination_op.nodes_found(self._degrees_lookup.value())
         self._update_after_prediction(case_combos, case_adj, nodes_found)
 
     def _predict_bad(self) -> None:
@@ -202,7 +203,7 @@ class AdjMatrPredictor:
         Then updates the lookup tables and remove the found combinations and nodes
         from the placeholder lists of nodes and combinations.
         """
-        case_combos, case_adj, nodes_found = combination_op.predict_bad(
+        case_combos, case_adj = combination_op.predict_bad(
             self._nodes,
             self._node_rows,
             self._node_adjacencies,
@@ -212,6 +213,7 @@ class AdjMatrPredictor:
             self._adjacencies_lookup,
             self._degrees_lookup,
         )
+        nodes_found = combination_op.nodes_found(self._degrees_lookup.value())
         self._update_after_prediction(case_combos, case_adj, nodes_found)
 
     def _update_after_prediction(

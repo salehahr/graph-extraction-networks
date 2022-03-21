@@ -471,7 +471,7 @@ class EdgeDG(GraphExtractionDG):
 
     def _get_combos(self, num_nodes: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:
         # shuffle before batching -- todo: set seed for np.random
-        combos = data_op.get_all_node_combinations(num_nodes)
+        combos = data_op.get_all_node_combinations(tf.cast(num_nodes, tf.int64))
         combos = data_op.get_reduced_node_combinations(
             combos,
             adj_matr,

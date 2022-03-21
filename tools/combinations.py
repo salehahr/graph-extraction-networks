@@ -256,6 +256,14 @@ def update_lookup(
     degrees_var.scatter_nd_update(tf.expand_dims(nodes, axis=-1), new_degrees)
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def get_capped_combos(combos, node_rows, node_adj_probs, node_degrees):
     # cap adjacencies based on degree
     node_adjacencies_capped = get_new_adjacencies(node_adj_probs, node_degrees)
@@ -312,7 +320,7 @@ def _predict_ok_good(
     comparison,
     nodes,
     node_rows,
-    node_adjacencies,
+    node_adj,
     node_adj_probs,
     combos,
     adjacencies,
@@ -320,8 +328,8 @@ def _predict_ok_good(
     degrees_var,
 ):
     # only get nodes which match current comparison type
-    (nodes, node_rows, node_adjacencies, node_adj_probs,) = filter_nodes_by_case(
-        comparison, nodes, node_rows, node_adjacencies, node_adj_probs
+    nodes, node_rows, _, _ = filter_nodes_by_case(
+        comparison, nodes, node_rows, node_adj, node_adj_probs
     )
 
     # get corresponding combinations
@@ -341,31 +349,28 @@ def _predict_ok_good(
         adjacencies_var, degrees_var, rows_, case_adj_, nodes_, node_adjacencies_
     )
 
-    # found nodes
-    nodes_found_ = nodes_found(degrees_var.value())
-
-    return case_combos_, case_adj_, nodes_found_
+    return case_combos_, case_adj_
 
 
 def _predict_bad(
     comparison,
     nodes,
     node_rows,
-    node_adjacencies,
+    node_adj,
     node_adj_probs,
     combos,
     adjacencies_var,
     degrees_var,
 ):
     # only get nodes which match current comparison type
-    (nodes, node_rows, node_adjacencies, node_adj_probs,) = filter_nodes_by_case(
-        comparison, nodes, node_rows, node_adjacencies, node_adj_probs
+    nodes, node_rows, _, node_adj_probs = filter_nodes_by_case(
+        comparison, nodes, node_rows, node_adj, node_adj_probs
     )
     node_degrees = tf.gather(degrees_var, nodes)
 
     # get corresponding combinations
     # remove combos based on new capped adjacencies
-    case_combos, case_adj, node_adjacencies = get_capped_combos(
+    case_combos, case_adj, _ = get_capped_combos(
         combos, node_rows, node_adj_probs, node_degrees
     )
 
@@ -383,16 +388,13 @@ def _predict_bad(
         adjacencies_var, degrees_var, rows_, case_adj_, nodes_, node_adjacencies_
     )
 
-    # found nodes
-    nodes_found_ = nodes_found(degrees_var.value())
-
-    return case_combos_, case_adj_, nodes_found_
+    return case_combos_, case_adj_
 
 
 def predict_ok_good(
     nodes,
     node_rows,
-    node_adjacencies,
+    node_adj,
     node_adj_probs,
     node_degrees,
     combos,
@@ -400,53 +402,53 @@ def predict_ok_good(
     adjacencies_var,
     degrees_var,
 ):
-    comparison = node_adjacencies <= node_degrees
+    comparison = node_adj <= node_degrees
     exist_nodes = tf.reduce_any(comparison)
-    case_combos, case_adj, nodes_found_ = tf.cond(
+    case_combos, case_adj = tf.cond(
         exist_nodes,
         true_fn=lambda: _predict_ok_good(
             comparison,
             nodes,
             node_rows,
-            node_adjacencies,
+            node_adj,
             node_adj_probs,
             combos,
             adjacencies,
             adjacencies_var,
             degrees_var,
         ),
-        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR, EMPTY_TENSOR),
+        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR),
     )
-    return case_combos, case_adj, nodes_found_
+    return case_combos, case_adj
 
 
 def predict_bad(
     nodes,
     node_rows,
-    node_adjacencies,
+    node_adj,
     node_adj_probs,
     node_degrees,
     combos,
     adjacencies_var,
     degrees_var,
 ):
-    comparison = node_adjacencies > node_degrees
+    comparison = node_adj > node_degrees
     exist_nodes = tf.reduce_any(comparison)
-    case_combos, case_adj, nodes_found_ = tf.cond(
+    case_combos, case_adj = tf.cond(
         exist_nodes,
         true_fn=lambda: _predict_bad(
             comparison,
             nodes,
             node_rows,
-            node_adjacencies,
+            node_adj,
             node_adj_probs,
             combos,
             adjacencies_var,
             degrees_var,
         ),
-        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR, EMPTY_TENSOR),
+        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR),
     )
-    return case_combos, case_adj, nodes_found_
+    return case_combos, case_adj
 
 
 @tf.function(
