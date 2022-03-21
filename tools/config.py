@@ -172,7 +172,6 @@ class RunConfig(BaseModel):
     run_type: Union[str, TestType]
 
     pretrained_weights: Optional[str] = None
-    search_radius: Optional[int] = None
     num_neighbours: Optional[int] = None
 
     parameters: Union[dict, RunParams]
