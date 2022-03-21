@@ -57,6 +57,7 @@ class AdjMatrPredictor:
         self._node_degrees: tf.Tensor
 
         self._skel_img: tf.Tensor
+        self._node_pos: tf.Tensor
         self._pos_list_xy: tf.Tensor
 
         # lookup tables
@@ -65,6 +66,10 @@ class AdjMatrPredictor:
 
         # flags
         self._stop_iterate: tf.bool
+
+    @property
+    def num_combos(self) -> tf.Tensor:
+        return tf.shape(self._combos)[0]
 
     def _set_stop(self) -> None:
         """Sets flag to stop iterating."""
@@ -75,8 +80,9 @@ class AdjMatrPredictor:
     ) -> None:
         """Initialises placeholders and flags before predicting."""
 
-        # store skel img
+        # store skel img, node_pos matrix
         self._skel_img = skel_img
+        self._node_pos = node_pos
         self._num_neighbours.assign(self._init_num_neighbours)
 
         # derived data; constants/reference
@@ -88,6 +94,12 @@ class AdjMatrPredictor:
         self._all_combos = data_op.get_all_node_combinations(num_nodes)
         all_nodes = tf.expand_dims(tf.range(num_nodes, dtype=tf.int64), axis=-1)
 
+        # initialise lookup values
+        self._adjacencies_lookup, self._degrees_lookup, self._A = get_placeholders(
+            self._all_combos, degrees_list, num_nodes
+        )
+        self._update = get_update_function(self._A)
+
         # iniitial/volatile; neighbours and prediction for neighbours
         self._reduced_combos = tf.identity(self._all_combos)
         self._combos = tools.neighbours.get_neighbours(
@@ -96,25 +108,8 @@ class AdjMatrPredictor:
             self._pos_list_xy,
             all_nodes,
         )
-        self._adjacency_probs, self._adjacencies = self._get_predictions(node_pos)
-        (
-            self._nodes,
-            self._node_rows,
-            self._node_adjacencies,
-            self._node_adj_probs,
-            self._node_degrees,
-        ) = combination_op.get_combo_nodes(
-            self._combos,
-            self._adjacencies,
-            self._adjacency_probs,
-            degrees_list,
-        )
-
-        # initialise lookup values
-        self._adjacencies_lookup, self._degrees_lookup, self._A = get_placeholders(
-            self._all_combos, degrees_list, num_nodes
-        )
-        self._update = get_update_function(self._A)
+        self._adjacency_probs, self._adjacencies = self._get_predictions()
+        self._update_nodes()
 
         # reset flags
         self._stop_iterate: tf.bool = tf.constant(False)
@@ -142,19 +137,26 @@ class AdjMatrPredictor:
 
         return self._A, self._skel_img, self._pos_list_xy
 
-    def _get_predictions(
-        self,
-        node_pos: tf.Tensor,
-    ) -> Tuple[tf.Tensor, tf.Tensor]:
+    def _get_predictions(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """Obtains the model prediction on current neighbour node combinations.."""
         current_batch = data_op.get_combo_inputs(
             tf.squeeze(self._skel_img),
-            tf.squeeze(node_pos),
+            tf.squeeze(self._node_pos),
             self._combos,
             self._pos_list_xy,
         )
         probabilities = self._predict_func(*current_batch)
-        return tools.evaluate.classify(probabilities)
+        adj, adj_probs = tools.evaluate.classify(probabilities)
+
+        # expand dimensions of (adj, adj_probs) if their lengths are one
+        return tf.cond(
+            tf.size(adj) > 1,
+            true_fn=lambda: (adj, adj_probs),
+            false_fn=lambda: (
+                tf.expand_dims(adj, axis=-1),
+                tf.expand_dims(adj_probs, axis=-1),
+            ),
+        )
 
     def _increase_neighbours(self):
         """Doubles the number of neighbours to be searched and
@@ -162,20 +164,14 @@ class AdjMatrPredictor:
         Sets stop flag if the newly generated combinations have
         the same length as the previous combinations.
         """
+        num_old_combos = tf.shape(self._combos)[0]
+
         # noinspection PyTypeChecker
         self._num_neighbours.assign(self._num_neighbours * 2)
-        nodes_not_found = combination_op.nodes_not_found(self._degrees_lookup.value())
-
-        len_old_combos = tf.shape(self._combos)[0]
-        self._combos = tools.neighbours.get_neighbours(
-            self._num_neighbours.value(),
-            self._reduced_combos,
-            self._pos_list_xy,
-            nodes_not_found,
-        )
+        self._update_combos()
 
         tf.cond(
-            (len_old_combos == tf.shape(self._combos)[0]),
+            (num_old_combos == self.num_combos),
             true_fn=lambda: self._set_stop(),
             false_fn=lambda: None,
         )
@@ -278,6 +274,37 @@ class AdjMatrPredictor:
         )
 
         # update list of nodes from the remaining combos
+        self._update_nodes()
+
+    def _preview(self) -> None:
+        """Plot the adjacency matrix."""
+        preview(self._A, self._skel_img, self._pos_list_xy)
+
+    def _update_combos(self):
+        """Updates combos, e.g. when number of neighbours is increased."""
+        nodes_not_found = combination_op.nodes_not_found(self._degrees_lookup.value())
+
+        self._combos = tools.neighbours.get_neighbours(
+            self._num_neighbours.value(),
+            self._reduced_combos,
+            self._pos_list_xy,
+            nodes_not_found,
+        )
+
+        # predict and update nodes only if combos are found
+        self._adjacency_probs, self._adjacencies = tf.cond(
+            self.num_combos > tf.constant(0),
+            true_fn=lambda: self._get_predictions(),
+            false_fn=lambda: (None, None),
+        )
+        tf.cond(
+            self.num_combos > tf.constant(0),
+            true_fn=lambda: self._update_nodes(),
+            false_fn=lambda: self._set_stop(),
+        )
+
+    def _update_nodes(self):
+        """Update list of nodes after performing update on self._combos."""
         (
             self._nodes,
             self._node_rows,
@@ -290,7 +317,3 @@ class AdjMatrPredictor:
             self._adjacency_probs,
             self._degrees_lookup.value(),
         )
-
-    def _preview(self) -> None:
-        """Plot the adjacency matrix."""
-        preview(self._A, self._skel_img, self._pos_list_xy)
