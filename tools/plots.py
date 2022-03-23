@@ -263,6 +263,7 @@ def plot_adj_matr(
     pos: np.ndarray,
     adjacency: np.ndarray,
     show: bool = True,
+    with_numbers: bool = True,
     title: Optional[str] = None,
 ) -> None:
     """
@@ -271,6 +272,9 @@ def plot_adj_matr(
     :param img_skel: skeletonised image
     :param pos: list of position coordinates of the graph nodes
     :param adjacency: adjacency matrix of the graph
+    :param show: whether to display plot or not
+    :param with_numbers: whether to display node IDs in plot
+    :param title: title of the plot
     """
     img = _lighten_skel_img(img_skel)
 
@@ -286,6 +290,25 @@ def plot_adj_matr(
 
     plt.imshow(img, extent=extent, interpolation="nearest", cmap="gray")
     plt.title(title, loc="left")
+
+    # annotate
+    if with_numbers:
+        for i, xy in pos_dict.items():
+            plt.annotate(
+                f"{i}",
+                xy=xy,
+                xytext=(-3, 3),
+                textcoords="offset points",
+                horizontalalignment="right",
+                verticalalignment="bottom",
+                fontsize="xx-small",
+                color="white",
+                # bbox=dict(
+                #     boxstyle="circle", ec="none", fc="navajowhite", alpha=0.5, pad=0.1
+                # ),
+            )
+
+    # graph
     nx.draw(
         graph,
         pos=pos_dict,
