@@ -508,6 +508,7 @@ def get_combos_to_keep(
         non_dup_adjs = tf.squeeze(
             tf.gather(node_adjacencies.flat_values, _non_dup_flat_indices)
         )
+        non_dup_adjs = tf.reshape(non_dup_adjs, (tf.size(non_dup_adjs),))
     else:
         non_dup_adjs = EMPTY_TENSOR
 
@@ -542,7 +543,7 @@ def get_combos_to_keep(
     combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
     adjacencies = (
         EMPTY_TENSOR
-        if is_empty_tensor(dup_adjs)
+        if tf.equal(tf.size(dup_adjs), 0)
         else tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
     )
 
