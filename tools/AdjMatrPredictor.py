@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import tensorflow as tf
 
@@ -29,7 +29,7 @@ class AdjMatrPredictor:
             tools.evaluate.get_edgenn_caller(model)
         )
         """Adjacency matrix update function, already traced."""
-        self._update: tf.types.experimental.ConcreteFunction
+        self._update_func: tf.types.experimental.ConcreteFunction
 
         # current image data
         self._skel_img: tf.Tensor
@@ -63,8 +63,7 @@ class AdjMatrPredictor:
         """Degrees of each node in self._nodes."""
         self._node_degrees: tf.Tensor
 
-        # lookup tables
-        self._adjacencies_lookup: tf.Variable
+        # lookup table
         self._degrees_lookup: tf.Variable
 
         # flags
@@ -73,6 +72,10 @@ class AdjMatrPredictor:
     @property
     def num_combos(self) -> tf.Tensor:
         return tf.shape(self._combos)[0]
+
+    @property
+    def nodes_not_found(self) -> tf.Tensor:
+        return combination_op.nodes_not_found(self._degrees_lookup.value())
 
     def _set_stop(self) -> None:
         """Sets flag to stop iterating."""
@@ -98,21 +101,12 @@ class AdjMatrPredictor:
         all_nodes = tf.expand_dims(tf.range(num_nodes, dtype=tf.int64), axis=-1)
 
         # initialise lookup values
-        self._adjacencies_lookup, self._degrees_lookup, self._A = get_placeholders(
-            self._all_combos, degrees_list, num_nodes
-        )
-        self._update = get_update_function(self._A)
+        self._degrees_lookup, self._A = get_placeholders(degrees_list, num_nodes)
+        self._update_func = get_update_function(self._A)
 
         # iniitial/volatile; neighbours and prediction for neighbours
         self._reduced_combos = tf.identity(self._all_combos)
-        self._combos = tools.neighbours.get_neighbours(
-            self._num_neighbours.value(),
-            self._reduced_combos,
-            self._pos_list_xy,
-            all_nodes,
-        )
-        self._adjacency_probs, self._adjacencies = self._get_predictions()
-        self._update_nodes()
+        self._update_neighbours(all_nodes)
 
         # reset flags
         self._stop_iterate: tf.bool = tf.constant(False)
@@ -161,7 +155,7 @@ class AdjMatrPredictor:
             ),
         )
 
-    def _increase_neighbours(self):
+    def _increase_neighbours(self) -> None:
         """Doubles the number of neighbours to be searched and
         geerates new neighbour pair combinations.
         Sets stop flag if the newly generated combinations have
@@ -171,7 +165,7 @@ class AdjMatrPredictor:
 
         # noinspection PyTypeChecker
         self._num_neighbours.assign(self._num_neighbours * 2)
-        self._update_combos()
+        self._update_neighbours()
 
         tf.cond(
             (num_old_combos == self.num_combos),
@@ -185,7 +179,13 @@ class AdjMatrPredictor:
         Then updates the lookup tables and remove the found combinations and nodes
         from the placeholder lists of nodes and combinations.
         """
-        case_combos, case_adj = combination_op.predict_ok_good(
+        (
+            case_combos,
+            case_adj,
+            self._nodes,
+            self._node_rows,
+            self._node_adjacencies,
+        ) = combination_op.predict_ok_good(
             self._nodes,
             self._node_rows,
             self._node_adjacencies,
@@ -193,11 +193,9 @@ class AdjMatrPredictor:
             self._node_degrees,
             self._combos,
             self._adjacencies,
-            self._adjacencies_lookup,
-            self._degrees_lookup,
+            self._degrees_lookup.value(),
         )
-        nodes_found = combination_op.nodes_found(self._degrees_lookup.value())
-        self._update_after_prediction(case_combos, case_adj, nodes_found)
+        self._update_after_prediction(case_combos, case_adj)
 
     def _predict_bad(self) -> None:
         """Generates list of combos and nodes found that match the case
@@ -206,69 +204,39 @@ class AdjMatrPredictor:
         Then updates the lookup tables and remove the found combinations and nodes
         from the placeholder lists of nodes and combinations.
         """
-        case_combos, case_adj = combination_op.predict_bad(
+        (
+            case_combos,
+            case_adj,
+            self._nodes,
+            self._node_rows,
+            self._node_adjacencies,
+        ) = combination_op.predict_bad(
             self._nodes,
             self._node_rows,
             self._node_adjacencies,
             self._node_adj_probs,
             self._node_degrees,
             self._combos,
-            self._adjacencies_lookup,
-            self._degrees_lookup,
+            self._degrees_lookup.value(),
         )
-        nodes_found = combination_op.nodes_found(self._degrees_lookup.value())
-        self._update_after_prediction(case_combos, case_adj, nodes_found)
+        self._update_after_prediction(case_combos, case_adj)
 
     def _update_after_prediction(
-        self, case_combos: tf.Tensor, case_adj: tf.Tensor, nodes_found: tf.Tensor
+        self, case_combos: tf.Tensor, case_adj: tf.Tensor
     ) -> None:
         """Updates adjacency matrix, then removes the combinations and nodes recently found
         from the lists of node pair combinations."""
+        combination_op.update_lookup(
+            self._degrees_lookup,
+            self._nodes,
+            self._node_adjacencies,
+        )
 
-        # update adjacency matrix
+        # update adjacency matrix, remove found combinations and nodes
         tf.cond(
             tf.size(case_combos) > 0,
-            true_fn=lambda: self._update(case_combos, case_adj, self._A),
+            true_fn=lambda: self._update_A_and_combos_from_case(case_combos, case_adj),
             false_fn=lambda: None,
-        )
-
-        # update combos: remove found combinations
-        self._reduced_combos = tf.cond(
-            tf.size(case_combos) > 0,
-            true_fn=lambda: combination_op.remove_combo_subset_from_all(
-                self._reduced_combos, case_combos
-            ),
-            false_fn=lambda: self._reduced_combos,
-        )
-        self._combos, self._adjacencies, self._adjacency_probs = tf.cond(
-            tf.size(case_combos) > 0,
-            true_fn=lambda: combination_op.remove_combo_subset(
-                self._combos, self._adjacencies, self._adjacency_probs, case_combos
-            ),
-            false_fn=lambda: (self._combos, self._adjacencies, self._adjacency_probs),
-        )
-
-        # update combos: remove found nodes
-        (
-            self._reduced_combos,
-            self._combos,
-            self._adjacencies,
-            self._adjacency_probs,
-        ) = tf.cond(
-            tf.size(nodes_found) > 0,
-            true_fn=lambda: combination_op.remove_nodes_found(
-                self._reduced_combos,
-                self._combos,
-                self._adjacencies,
-                self._adjacency_probs,
-                nodes_found,
-            ),
-            false_fn=lambda: (
-                self._reduced_combos,
-                self._combos,
-                self._adjacencies,
-                self._adjacency_probs,
-            ),
         )
 
         # set stop flag if pool of possible combos has reduced to zero
@@ -281,19 +249,57 @@ class AdjMatrPredictor:
         # update list of nodes from the remaining combos
         self._update_nodes()
 
+    def _update_A_and_combos_from_case(
+        self, case_combos: tf.Tensor, case_adj: tf.Tensor
+    ) -> None:
+        # update adjacency matrix
+        self._update_func(case_combos, case_adj, self._A)
+
+        # update combos: remove found combinations
+        self._reduced_combos = combination_op.remove_combo_subset_from_all(
+            self._reduced_combos, case_combos
+        )
+        (
+            self._combos,
+            self._adjacencies,
+            self._adjacency_probs,
+        ) = combination_op.remove_combo_subset(
+            self._combos, self._adjacencies, self._adjacency_probs, case_combos
+        )
+
+        # update combos: remove found nodes
+        nodes_found = combination_op.nodes_found(self._degrees_lookup.value())
+        tf.cond(
+            tf.size(nodes_found) > 0,
+            true_fn=lambda: self._remove_found_nodes(nodes_found),
+            false_fn=lambda: None,
+        )
+
+    def _remove_found_nodes(self, nodes_found: tf.Tensor) -> None:
+        (
+            self._reduced_combos,
+            self._combos,
+            self._adjacencies,
+            self._adjacency_probs,
+        ) = combination_op.remove_nodes_found(
+            self._reduced_combos,
+            self._combos,
+            self._adjacencies,
+            self._adjacency_probs,
+            nodes_found,
+        )
+
     def _preview(self) -> None:
         """Plot the adjacency matrix."""
         preview(self._A, self._skel_img, self._pos_list_xy)
 
-    def _update_combos(self):
-        """Updates combos, e.g. when number of neighbours is increased."""
-        nodes_not_found = combination_op.nodes_not_found(self._degrees_lookup.value())
-
+    def _update_neighbours(self, nodes: Optional[tf.Tensor] = None) -> None:
+        """Updates node pair combos with new neighbours."""
         self._combos = tools.neighbours.get_neighbours(
             self._num_neighbours.value(),
             self._reduced_combos,
             self._pos_list_xy,
-            nodes_not_found,
+            self.nodes_not_found if nodes is None else nodes,
         )
 
         # predict and update nodes only if combos are found
@@ -308,7 +314,7 @@ class AdjMatrPredictor:
             false_fn=lambda: self._set_stop(),
         )
 
-    def _update_nodes(self):
+    def _update_nodes(self) -> None:
         """Update list of nodes after performing update on self._combos."""
         (
             self._nodes,

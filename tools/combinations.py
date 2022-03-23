@@ -66,9 +66,8 @@ def combos_without_nodes(
 
     nodes, node_rows = unique_nodes_from_combo(combos_new)
     node_adjacencies = tf.reduce_sum(tf.gather(adjacencies_new, node_rows), axis=1)
-    rows = tf.unique(node_rows.flat_values).y
 
-    return combos_new, adjacencies_new, nodes, rows, node_adjacencies
+    return combos_new, adjacencies_new, nodes, node_rows, node_adjacencies
 
 
 @tf.function(
@@ -156,7 +155,7 @@ def remove_combo_subset(
 def remove_combo_subset_from_all(
     combos: tf.Tensor,
     subset: tf.Tensor,
-) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+) -> tf.Tensor:
     """
     Given combos of dimension [c, 2] and a subset of it with dimensions [s, 2],
     returns the complement of the intersection between the two.
@@ -215,7 +214,6 @@ def remove_conflicting(
 
     # all nodes in combos
     nodes, node_rows = unique_nodes_from_combo(combos)
-    rows = tf.unique(node_rows.flat_values).y
     node_adjacencies = tf.reduce_sum(tf.gather(adjacencies, node_rows), axis=1)
 
     # degrees check
@@ -229,13 +227,13 @@ def remove_conflicting(
     bad_nodes_exist = tf.size(bad_nodes) != 0
 
     # trim combos
-    combos_, adjacencies_, nodes_, rows_, node_adjacencies_ = tf.cond(
+    combos_, adjacencies_, nodes_, node_rows_, node_adjacencies_ = tf.cond(
         bad_nodes_exist,
         true_fn=lambda: combos_without_nodes(bad_nodes, combos, adjacencies),
-        false_fn=lambda: (combos, adjacencies, nodes, rows, node_adjacencies),
+        false_fn=lambda: (combos, adjacencies, nodes, node_rows, node_adjacencies),
     )
 
-    return combos_, adjacencies_, nodes_, rows_, node_adjacencies_
+    return combos_, adjacencies_, nodes_, node_rows_, node_adjacencies_
 
 
 @tf.function(input_signature=[tf.TensorSpec(shape=(None,), dtype=tf.int64)])
@@ -244,15 +242,10 @@ def nodes_found(degrees: tf.Tensor) -> tf.Tensor:
     return tf.squeeze(tf.where(tf.equal(degrees, 0)))
 
 
-def update_lookup(
-    adjacencies_var, degrees_var, combo_ids, adjacencies, nodes, node_adjacencies
-):
-    # update adjacencies
-    adjacencies_var.scatter_nd_update(tf.expand_dims(combo_ids, axis=-1), adjacencies)
-
+def update_lookup(degrees_var: tf.Variable, nodes: tf.Tensor, node_adj: tf.Tensor):
     # update degrees
     node_degrees = tf.gather(degrees_var, nodes)
-    new_degrees = node_degrees - node_adjacencies
+    new_degrees = node_degrees - node_adj
     degrees_var.scatter_nd_update(tf.expand_dims(nodes, axis=-1), new_degrees)
 
 
@@ -316,6 +309,18 @@ def combos_from_node_rows(combos, adjacencies, rows_in_combos):
     return combos_, adjacencies_
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None,), dtype=tf.bool),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def _predict_ok_good(
     comparison,
     nodes,
@@ -324,8 +329,7 @@ def _predict_ok_good(
     node_adj_probs,
     combos,
     adjacencies,
-    adjacencies_var,
-    degrees_var,
+    degrees_list,
 ):
     # only get nodes which match current comparison type
     nodes, node_rows, _, _ = filter_nodes_by_case(
@@ -340,18 +344,24 @@ def _predict_ok_good(
         case_combos_,
         case_adj_,
         nodes_,
-        rows_,
+        node_rows_,
         node_adjacencies_,
-    ) = remove_conflicting(case_combos, case_adj, degrees_var.value())
+    ) = remove_conflicting(case_combos, case_adj, degrees_list)
 
-    # update lookup
-    update_lookup(
-        adjacencies_var, degrees_var, rows_, case_adj_, nodes_, node_adjacencies_
-    )
-
-    return case_combos_, case_adj_
+    return case_combos_, case_adj_, nodes_, node_rows_, node_adjacencies_
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None,), dtype=tf.bool),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def _predict_bad(
     comparison,
     nodes,
@@ -359,14 +369,13 @@ def _predict_bad(
     node_adj,
     node_adj_probs,
     combos,
-    adjacencies_var,
-    degrees_var,
+    degrees_list,
 ):
     # only get nodes which match current comparison type
     nodes, node_rows, _, node_adj_probs = filter_nodes_by_case(
         comparison, nodes, node_rows, node_adj, node_adj_probs
     )
-    node_degrees = tf.gather(degrees_var, nodes)
+    node_degrees = tf.gather(degrees_list, nodes)
 
     # get corresponding combinations
     # remove combos based on new capped adjacencies
@@ -379,18 +388,25 @@ def _predict_bad(
         case_combos_,
         case_adj_,
         nodes_,
-        rows_,
+        node_rows_,
         node_adjacencies_,
-    ) = remove_conflicting(case_combos, case_adj, degrees_var.value())
+    ) = remove_conflicting(case_combos, case_adj, degrees_list)
 
-    # update lookup
-    update_lookup(
-        adjacencies_var, degrees_var, rows_, case_adj_, nodes_, node_adjacencies_
-    )
-
-    return case_combos_, case_adj_
+    return case_combos_, case_adj_, nodes_, node_rows_, node_adjacencies_
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def predict_ok_good(
     nodes,
     node_rows,
@@ -399,12 +415,11 @@ def predict_ok_good(
     node_degrees,
     combos,
     adjacencies,
-    adjacencies_var,
-    degrees_var,
+    degrees_list,
 ):
     comparison = node_adj <= node_degrees
     exist_nodes = tf.reduce_any(comparison)
-    case_combos, case_adj = tf.cond(
+    case_combos, case_adj, nodes_, node_rows_, node_adj_ = tf.cond(
         exist_nodes,
         true_fn=lambda: _predict_ok_good(
             comparison,
@@ -414,14 +429,24 @@ def predict_ok_good(
             node_adj_probs,
             combos,
             adjacencies,
-            adjacencies_var,
-            degrees_var,
+            degrees_list,
         ),
-        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR),
+        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR, nodes, node_rows, node_adj),
     )
-    return case_combos, case_adj
+    return case_combos, case_adj, nodes_, node_rows_, node_adj_
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.float32, ragged_rank=1),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.TensorSpec(shape=(None,), dtype=tf.int64),
+    ]
+)
 def predict_bad(
     nodes,
     node_rows,
@@ -429,12 +454,11 @@ def predict_bad(
     node_adj_probs,
     node_degrees,
     combos,
-    adjacencies_var,
-    degrees_var,
+    degrees_list,
 ):
     comparison = node_adj > node_degrees
     exist_nodes = tf.reduce_any(comparison)
-    case_combos, case_adj = tf.cond(
+    case_combos, case_adj, nodes_, node_rows_, node_adj_ = tf.cond(
         exist_nodes,
         true_fn=lambda: _predict_bad(
             comparison,
@@ -443,12 +467,11 @@ def predict_bad(
             node_adj,
             node_adj_probs,
             combos,
-            adjacencies_var,
-            degrees_var,
+            degrees_list,
         ),
-        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR),
+        false_fn=lambda: (EMPTY_TENSOR, EMPTY_TENSOR, nodes, node_rows, node_adj),
     )
-    return case_combos, case_adj
+    return case_combos, case_adj, nodes_, node_rows_, node_adj_
 
 
 @tf.function(
@@ -469,6 +492,14 @@ def get_new_adjacencies(
     return tf.cast(adjacencies, tf.int64)
 
 
+@tf.function(
+    input_signature=[
+        [
+            tf.TensorSpec(shape=(None,), dtype=tf.float32),
+            tf.TensorSpec(shape=None, dtype=tf.int64),
+        ]
+    ]
+)
 def new_adjacencies(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
     """Returns new adjacency vector with <degree> of the highest probability entries."""
     probs, degree = args[0], args[1]
@@ -481,8 +512,15 @@ def new_adjacencies(args: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
     return new_adj
 
 
+@tf.function(
+    input_signature=[
+        tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+        tf.RaggedTensorSpec(shape=None, dtype=tf.int64, ragged_rank=1),
+    ]
+)
 def get_combos_to_keep(
-    combos: tf.Tensor, node_rows: tf.RaggedTensor, node_adjacencies: tf.RaggedTensor
+    combos: tf.Tensor, node_rows: tf.RaggedTensor, node_adj: tf.RaggedTensor
 ):
     non_duplicate_combo_ids, duplicate_combo_ids = check_duplicate_combo_ids(node_rows)
     # unique_combo_ids, _, counts = tf.unique_with_counts(node_rows.flat_values)
@@ -506,14 +544,14 @@ def get_combos_to_keep(
     # adjacencies
     if exist_non_duplicates:
         non_dup_adjs = tf.squeeze(
-            tf.gather(node_adjacencies.flat_values, _non_dup_flat_indices)
+            tf.gather(node_adj.flat_values, _non_dup_flat_indices)
         )
         non_dup_adjs = tf.reshape(non_dup_adjs, (tf.size(non_dup_adjs),))
     else:
         non_dup_adjs = EMPTY_TENSOR
 
     if exist_duplicates:
-        dup_adjs = tf.gather(node_adjacencies.flat_values, _dup_flat_indices)[..., 0]
+        dup_adjs = tf.gather(node_adj.flat_values, _dup_flat_indices)[..., 0]
         dup_is_same_adj = tf.map_fn(
             lambda x: tf.reduce_all(tf.equal(tf.reduce_mean(x), x)),
             elems=dup_adjs,
@@ -526,17 +564,11 @@ def get_combos_to_keep(
 
         combo_ids_to_discard = tf.gather(duplicate_combo_ids, _dups_to_discard_idcs)
         exist_nodes_to_discard = tf.not_equal(tf.shape(combo_ids_to_discard), 0)
-        # if not exist_nodes_to_discard:
-        #     return combos, tf.gather(node_adjacencies.flat_values, )
 
-        # take non-discarded duplicate values
-        combo_ids = tf.gather(duplicate_combo_ids, _dups_to_keep_idcs)
-        adjacencies = tf.gather(dup_adjs[:, 0], _dups_to_keep_idcs)
     else:
         dup_adjs = EMPTY_TENSOR
+        _dups_to_discard_idcs = EMPTY_TENSOR
         _dups_to_keep_idcs = EMPTY_TENSOR
-        combo_ids = EMPTY_TENSOR
-        adjacencies = EMPTY_TENSOR
         exist_nodes_to_discard = False
 
     # take non-discarded duplicate values
@@ -563,22 +595,22 @@ def get_combos_to_keep(
         )
 
         adj_diff = tf.cast(
-            tf.gather(node_adjacencies.flat_values, node_row_idcs_to_discard),
+            tf.gather(node_adj.flat_values, node_row_idcs_to_discard),
             tf.int64,
         )
         adj_diff = tf.reshape(adj_diff, discard_shape)[:, 0]
 
         node_row_idcs_to_discard = tf.reshape(node_row_idcs_to_discard, discard_shape)
-        adj_flat_shape = tf.shape(node_adjacencies.flat_values, out_type=tf.int64)
+        adj_flat_shape = tf.shape(node_adj.flat_values, out_type=tf.int64)
 
-        adj_diff = node_adjacencies.flat_values - tf.scatter_nd(
+        adj_diff = node_adj.flat_values - tf.scatter_nd(
             node_row_idcs_to_discard, adj_diff, adj_flat_shape
         )
         node_adjacencies_new = tf.RaggedTensor.from_row_splits(
-            adj_diff, node_adjacencies.row_splits
+            adj_diff, node_adj.row_splits
         )
     else:
-        node_adjacencies_new = node_adjacencies
+        node_adjacencies_new = node_adj
 
     node_adjacencies_sum = tf.reduce_sum(node_adjacencies_new, axis=1)
 

@@ -43,21 +43,15 @@ def get_update_function(A: tf.Variable) -> tf.types.experimental.ConcreteFunctio
 
 
 def get_placeholders(
-    all_combos: tf.Tensor, degrees_list: tf.Tensor, num_nodes: tf.Tensor
-) -> Tuple[tf.Variable, tf.Variable, tf.Variable]:
-    adjacencies_var = tf.Variable(
-        initial_value=tf.repeat(
-            tf.constant(-1, dtype=tf.int64), repeats=tf.shape(all_combos)[0]
-        ),
-        trainable=False,
-    )
+    degrees_list: tf.Tensor, num_nodes: tf.Tensor
+) -> Tuple[tf.Variable, tf.Variable]:
     degrees_var = tf.Variable(initial_value=degrees_list, trainable=False)
     A = tf.Variable(
         initial_value=tf.zeros((num_nodes, num_nodes), dtype=tf.int64),
         trainable=False,
     )
 
-    return adjacencies_var, degrees_var, A
+    return degrees_var, A
 
 
 def preview(
