@@ -31,11 +31,18 @@ class AdjMatrPredictor:
         """Adjacency matrix update function, already traced."""
         self._update: tf.types.experimental.ConcreteFunction
 
-        # placeholders
-        self._A: tf.Variable
+        # current image data
+        self._skel_img: tf.Tensor
+        self._node_pos: tf.Tensor
+        self._pos_list_xy: tf.Tensor
 
         """All initially available node pair combinations."""
         self._all_combos: tf.Tensor
+
+        # placeholders
+        """Adjacency matrix."""
+        self._A: tf.Variable
+
         """Pool of combinations to choose from when generating neighbour combinations."""
         self._reduced_combos: tf.Tensor
         """Pair combinations based on number of neighbours set."""
@@ -55,10 +62,6 @@ class AdjMatrPredictor:
         self._node_adj_probs: tf.RaggedTensor
         """Degrees of each node in self._nodes."""
         self._node_degrees: tf.Tensor
-
-        self._skel_img: tf.Tensor
-        self._node_pos: tf.Tensor
-        self._pos_list_xy: tf.Tensor
 
         # lookup tables
         self._adjacencies_lookup: tf.Variable
