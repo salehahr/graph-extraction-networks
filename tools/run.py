@@ -151,8 +151,9 @@ def train(
     num_steps_train = _get_num_steps(
         training_data, steps_in_epoch, max_num_images, debug
     )
+    max_num_images_val = max_num_images // 2 if max_num_images else None
     num_steps_validation = _get_num_steps(
-        validation_data, steps_in_epoch, max_num_images, debug
+        validation_data, steps_in_epoch, max_num_images_val, debug
     )
 
     history = model_.fit(
