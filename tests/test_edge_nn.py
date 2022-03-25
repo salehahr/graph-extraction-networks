@@ -27,6 +27,7 @@ class TestEdgeNN(unittest.TestCase):
         edge_nn = EdgeNN(
             input_size=(*cls.config.img_dims, 1),
             n_filters=num_filters,
+            batch_norm=cls.run_config.parameters.batch_norm,
             pretrained_weights=None,
         )
         edge_nn.build()
@@ -76,7 +77,7 @@ class TestEdgeNN(unittest.TestCase):
         run.end()
 
     def test_sweep(self):
-        sweep_id = "7dvdz8dt"
+        sweep_id = None
         run.sweep(self.run_config, self._train_for_sweep, count=5, sweep_id=sweep_id)
 
     def _train_for_sweep(self):

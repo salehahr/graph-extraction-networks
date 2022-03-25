@@ -154,6 +154,7 @@ class RunParams(BaseModel):
     adjacency_frac: Optional[int] = None
     node_pairs_in_batch: Optional[int] = None
     n_filters: Optional[int] = None
+    batch_norm: bool = True
     n_conv2_blocks: Optional[int] = None
     n_conv3_blocks: Optional[int] = None
 

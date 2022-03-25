@@ -22,6 +22,7 @@ parameters:
   node_pairs_in_batch: 4
   # model params
   n_filters: 6
+  batch_norm: false
   n_conv2_blocks: 2
   n_conv3_blocks: 2
 
@@ -32,6 +33,9 @@ sweep_config:
   metric:
     name: val_precision
     goal: maximize
+  early_terminate:
+    type: hyperband
+    min_iter: 20
   parameters:
     optimiser:
       value: radam
@@ -43,6 +47,8 @@ sweep_config:
       value: 2
     node_pairs_in_batch:
       value: 2
+    batch_norm:
+      values: [true, false]
     n_filters:
       values: [2, 3, 4]
     n_conv2_blocks:

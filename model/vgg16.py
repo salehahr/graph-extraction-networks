@@ -23,6 +23,7 @@ class VGG16(Model):
         self,
         input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
         n_filters: int,
+        batch_norm: bool,
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
         pretrained_weights: Optional[str] = None,
@@ -30,6 +31,7 @@ class VGG16(Model):
         optimiser: str = "Adam",
     ):
         self.n_filters = n_filters
+        self.batch_norm = batch_norm
         self.n_conv2_blocks = n_conv2_blocks
         self.n_conv3_blocks = n_conv3_blocks
 
@@ -86,7 +88,7 @@ class VGG16(Model):
                 x,
                 self.n_filters * 2 ** (i - 1),
                 f"block{i}",
-                normalise=True,
+                normalise=self.batch_norm,
             )
             x = pooling(x, dropout_rate=0)
 
@@ -100,7 +102,7 @@ class VGG16(Model):
 
         for i in range(self.n_conv2_blocks + 1, final_block_num + 1):
             x = double_conv(
-                x, self.n_filters * 2 ** (i - 1), f"block{i}", normalise=True
+                x, self.n_filters * 2 ** (i - 1), f"block{i}", normalise=self.batch_norm
             )
             x = single_conv(
                 x,
@@ -109,7 +111,7 @@ class VGG16(Model):
                 activation="relu",
                 name=f"relu_C3_block{i}",
                 padding=True,
-                normalise=True,
+                normalise=self.batch_norm,
             )
             x = pooling(x, dropout_rate=0)
 
@@ -155,6 +157,7 @@ class EdgeNN(VGG16):
         self,
         input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
         n_filters: int,
+        batch_norm: bool,
         n_conv2_blocks: int = 2,
         n_conv3_blocks: int = 3,
         pretrained_weights: Optional[str] = None,
@@ -167,6 +170,7 @@ class EdgeNN(VGG16):
         super(EdgeNN, self).__init__(
             input_size,
             n_filters,
+            batch_norm,
             n_conv2_blocks,
             n_conv3_blocks,
             pretrained_weights,
@@ -215,7 +219,7 @@ class EdgeNN(VGG16):
                 x,
                 self.n_filters * 2 ** (i - 1),
                 f"block{i}",
-                normalise=True,
+                normalise=self.batch_norm,
                 concat_value=node_pair,
             )
             x = pooling(x, dropout_rate=0)

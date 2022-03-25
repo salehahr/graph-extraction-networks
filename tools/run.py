@@ -102,6 +102,7 @@ def load_model(
         model_ = EdgeNN(
             input_size=(*config.img_dims, 1),
             n_filters=params.n_filters,
+            batch_norm=params.batch_norm,
             n_conv2_blocks=params.n_conv2_blocks,
             n_conv3_blocks=params.n_conv3_blocks,
             pretrained_weights=run_config.pretrained_weights,
