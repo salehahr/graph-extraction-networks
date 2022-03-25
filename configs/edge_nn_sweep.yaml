@@ -1,0 +1,53 @@
+project: edge_extraction
+entity: salehah
+
+
+# run details
+run_name: edgenn_sweep
+resume: false
+run_id: null
+run_type: training
+
+
+parameters:
+  # training params
+  optimiser: radam
+  train_imgs: 1000
+  epochs: 50
+  learning_rate: 1e-3
+  batch_size: 8
+  node_pairs_in_batch: 4
+  # model params
+  n_filters: 6
+  n_conv2_blocks: 2
+  n_conv3_blocks: 2
+
+
+sweep_config:
+  name: tuning
+  method: random
+  metric:
+    name: val_precision
+    goal: maximize
+  early_terminate:
+    type: hyperband
+    min_iter: 17
+  parameters:
+    optimiser:
+      value: radam
+    learning_rate:
+      value: 1e-3
+    epochs:
+      value: 50
+    batch_size:
+      value: 8
+    node_pairs_in_batch:
+      value: 4
+    batch_norm:
+      values: [true, false]
+    n_filters:
+      values: [2, 3, 4, 5, 6]
+    n_conv2_blocks:
+      values: [1, 2, 3]
+    n_conv3_blocks:
+      values: [1, 2, 3]

@@ -1,0 +1,25 @@
+img_length: 256
+
+network:
+  node_extraction:
+    id: 2
+    input_channels: 1
+    output_channels: 3
+  edge_extraction:
+    id: 3
+    input_channels: 3
+    output_channels: 1
+  graph_extraction:
+    id: 4
+    input_channels: 3
+    output_channels: 1
+
+base_path: /graphics/scratch/schuelej/sar/tfgraph/
+data_path: /graphics/scratch/schuelej/sar/data/256
+save_path: /graphics/scratch/schuelej/sar/data/256/results
+
+validation_fraction: 0.2
+adjacency_fraction: 0.2
+
+use_small_dataset: false
+max_files: null # integer if above is true, else null
