@@ -1,19 +1,23 @@
-from typing import Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Tuple
 
 import tensorflow as tf
 
-from model import EdgeNN
 from tools.postprocessing import tf_classify
 
+if TYPE_CHECKING:
+    from model import EdgeNN
 
-def get_edgenn_caller(model: EdgeNN) -> tf.types.experimental.ConcreteFunction:
+
+def get_edgenn_caller(model_: EdgeNN) -> tf.types.experimental.ConcreteFunction:
     def evaluate(
-        model: EdgeNN, skel_img: tf.Tensor, node_pos: tf.Tensor, combo_img: tf.Tensor
+        model__: EdgeNN, skel_img: tf.Tensor, node_pos: tf.Tensor, combo_img: tf.Tensor
     ):
-        return model((skel_img, node_pos, combo_img), training=False)
+        return model__((skel_img, node_pos, combo_img), training=False)
 
     return tf.function(evaluate).get_concrete_function(
-        model=model,
+        model=model_,
         skel_img=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.float32),
         node_pos=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.uint8),
         combo_img=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.int64),

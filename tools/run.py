@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import wandb
-from keras.callbacks import Callback
+from keras.callbacks import Callback, ModelCheckpoint
 from wandb.integration.keras import WandbCallback
 
 from model import EdgeNN
@@ -165,6 +165,7 @@ def train(
         callbacks=[
             WandbCallback(save_weights_only=True),
             PredictionCallback(predict_frequency, validation_data),
+            BestPrecisionCallback(),
         ],
     )
 
@@ -336,5 +337,30 @@ class PredictionCallback(Callback):
             predict(
                 self.model,
                 self.validation_data,
-                description=f"Prediction on epoch {epoch + 1}/{self.total_epochs}.",
+                description=f"Prediction on epoch {epoch}/{self.total_epochs}.",
             )
+
+
+class BestPrecisionCallback(ModelCheckpoint):
+    def __init__(self, **kwargs):
+        filepath = os.path.join(
+            wandb.run.dir, "weights.ep_{epoch:02d}-valprec_{val_precision:.3f}.hdf5"
+        )
+        super(BestPrecisionCallback, self).__init__(
+            filepath,
+            monitor="val_precision",
+            verbose=1,
+            save_best_only=True,
+            save_weights_only=True,
+            mode="max",
+            **kwargs,
+        )
+
+        self._filepath = filepath
+
+    def on_epoch_end(self, epoch, logs=None):
+        super(BestPrecisionCallback, self).on_epoch_end(epoch, logs)
+
+        current = logs.get(self.monitor)
+        if self.monitor_op(current, self.best):
+            wandb.save(self._filepath)

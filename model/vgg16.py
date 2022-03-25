@@ -3,7 +3,6 @@ from typing import Optional, Tuple, Union
 
 import tensorflow as tf
 import tensorflow_addons as tfa
-from keras.callbacks import ModelCheckpoint
 from tensorflow.keras.layers import GlobalMaxPooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
@@ -141,17 +140,6 @@ class VGG16(Model):
             metrics=metrics,
             run_eagerly=False,
             **kwargs,
-        )
-
-    @staticmethod
-    def checkpoint(filepath, save_frequency="epoch"):
-        return ModelCheckpoint(
-            filepath,
-            monitor="epoch_loss",
-            verbose=1,
-            save_best_only=False,
-            save_weights_only=True,
-            save_freq=save_frequency,
         )
 
 

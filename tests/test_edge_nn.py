@@ -19,7 +19,6 @@ class TestEdgeNN(unittest.TestCase):
         num_filters = 4
         cls.weights = os.path.join(cls.config.base_path, "weights_edge_nn.hdf5")
         cls.model = cls._init_model(num_filters)
-        cls.checkpoint = cls.model.checkpoint(cls.config.checkpoint_path)
 
         cls.edge_data = get_eedg(cls.config, cls.run_config)
 
