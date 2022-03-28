@@ -90,6 +90,8 @@ def plot_training_sample(
 def plot_sample_nodes_nn(
     data_generator, step_num: int, row: int = 0, rows: int = 0, **kwargs
 ):
+    plot_small = kwargs.get("small_section")
+
     input_names = ["skel"]
     output_names = ["node_pos", "degrees", "node_types"]
     data_names = input_names + output_names
@@ -98,10 +100,14 @@ def plot_sample_nodes_nn(
     set_plot_title(data_names, row, rows)
 
     b_skel_img, b_y = data_generator[step_num]
+    if plot_small:
+        b_skel_img = b_skel_img[:, 100:200, 100:200, :]
+        b_y = tuple(y[:, 100:200, 100:200, :] for y in b_y)
 
     # input
     plt.subplot(rows, 4, get_subplot_id(row, 0, num_cols=num_cols))
     input_img = np.float32(b_skel_img[row].numpy())
+
     plot_img(input_img, cmap="gray")
 
     # outputs

@@ -5,7 +5,7 @@ import networkx as nx
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 
-from tools import Config, GraphExtractionDG, NodeExtractionDG, TestType
+from tools import Config, GraphExtractionDG, NodeExtractionDG, RunConfig, TestType
 from tools.adj_matr import transform_A
 from tools.plots import plot_augmented, plot_training_sample
 from tools.sort import sort_nodes
@@ -15,6 +15,7 @@ class TestNodesNNDataAugmentation(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.config = Config("test_config.yaml")
+        cls.run_config = RunConfig("test_wandb_config.yaml", cls.config)
 
         cls.img_datagen = cls._init_old_data_augmenter()
         cls.aug_seed = 1
@@ -41,6 +42,7 @@ class TestNodesNNDataAugmentation(unittest.TestCase):
         data_gen_args = dict(
             horizontal_flip=True,
             vertical_flip=True,
+            # rotation_range=90,
         )
 
         return ImageDataGenerator(**data_gen_args)
@@ -60,7 +62,9 @@ class TestNodesNNDataAugmentation(unittest.TestCase):
 
     def _get_first_batch(self) -> Tuple:
         """Gets first training batch."""
-        plot_training_sample(self.training_data, network=self.network.id, rows=1)
+        plot_training_sample(
+            self.training_data, network=self.network.id, rows=1, small_section=True
+        )
 
         # gets the first batch (>= 1 images in batch)
         return self.training_data[0]
@@ -70,7 +74,12 @@ class TestNodesNNDataAugmentation(unittest.TestCase):
         """
         For testing the method previously used for data augmentation.
         """
-        skel_img, node_pos, degrees, node_types = self._get_samples()
+        samples = self._get_samples()
+
+        # small section for report/graphics
+        skel_img, node_pos, degrees, node_types = [
+            s[:, 100:200, 100:200, :] for s in samples
+        ]
 
         skel_img_aug = self._aug_imgs(skel_img)
         graph_aug = {
