@@ -13,7 +13,7 @@ from wandb.integration.keras import WandbCallback
 from model import EdgeNN
 from tools import Config, RunConfig
 from tools.plots import plot_node_pairs_on_skel
-from tools.postprocessing import classify
+from tools.postprocessing import classify, smooth
 from tools.TestType import TestType
 
 if TYPE_CHECKING:
@@ -60,6 +60,7 @@ def start(
         reinit=reinit,
         id=id_,
     )
+    # wandb.run.define_metric("val_precision", summary="best", goal="maximize")
 
     best_model_fp = os.path.join(wandb.run.dir, "model-best.h5")
     wandb.save(glob_str=best_model_fp, base_path=wandb.run.dir, policy="live")
@@ -355,6 +356,7 @@ class BestPrecisionCallback(ModelCheckpoint):
         filepath = os.path.join(
             wandb.run.dir, "weights.ep_{epoch:02d}-valprec_{val_precision:.3f}.hdf5"
         )
+
         super(BestPrecisionCallback, self).__init__(
             filepath,
             monitor="val_precision",
@@ -365,11 +367,57 @@ class BestPrecisionCallback(ModelCheckpoint):
             **kwargs,
         )
 
+        self.k = 10
+        self.api_run = wandb.Api().run(wandb.run.path)
+        self.best = self._get_best_smoothed()
+        self.prev = self.best
+
+        # add key to wandb summary if not already available
+        self._key = f"best_{self.monitor}"
+        if self._key not in wandb.summary.keys():
+            self._update_wandb_summary()
+
         self._filepath = filepath
 
     def on_epoch_end(self, epoch, logs=None):
+        # note: epoch starts from 0
+
+        # parent method automatically updates self.best
         super(BestPrecisionCallback, self).on_epoch_end(epoch, logs)
 
-        current = logs.get(self.monitor)
-        if self.monitor_op(current, self.best):
+        if self.monitor_op(self.best, self.prev):
             wandb.save(self._filepath)
+
+            self.best = self._get_best_smoothed(epoch=epoch)
+            self.prev = self.best
+
+            self._update_wandb_summary()
+
+    def _update_wandb_summary(self):
+        wandb.summary[self._key] = self.best
+
+    def _get_best_smoothed(self, epoch: Optional[int] = None) -> float:
+        history = self._get_history(epoch=epoch)
+        return max(smooth(history, k=self.k))
+
+    def _get_history(self, epoch: Optional[int] = None) -> List[float]:
+        history: List[dict] = self.api_run.history(keys=[self.monitor], pandas=False)
+
+        if history:
+            last_epoch = history[-1].get("_step")
+            metric_history: List[float] = [h[self.monitor] for h in history]
+
+            # wandb callback has already been called
+            if last_epoch == epoch or epoch is None:
+                pass
+            # wandb not updated yet
+            elif last_epoch == epoch - 1:
+                metric_history += [self.best]
+            else:
+                raise Exception(
+                    f"History ({len(metric_history)} entries, final epoch {last_epoch}) does not match current epoch {epoch}."
+                )
+
+            return metric_history
+        else:
+            return [0.0]
