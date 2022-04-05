@@ -150,7 +150,7 @@ class VGG16(Model):
         ]
 
         self.compile(
-            optimizer=Adam(learning_rate=self.learning_rate),
+            optimizer=self.optimiser,
             loss="binary_crossentropy",
             metrics=metrics,
             **kwargs,
