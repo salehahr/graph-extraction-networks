@@ -13,7 +13,13 @@ class TestEdgeNN(unittest.TestCase):
     def setUpClass(cls) -> None:
         data_config_fp = "test_config.yaml"
         run_config_fp = "test_wandb_config_edge.yaml"
-        cls.config, cls.run_config = run.get_configs(data_config_fp, run_config_fp)
+        resume_config_fp = "test_wandb_resume.yaml"
+
+        cls.config, run_configs = run.get_configs(
+            data_config_fp, [run_config_fp, resume_config_fp]
+        )
+        cls.run_config, cls.resume_config = run_configs
+
         cls.network = cls.config.network.edge_extraction
 
         num_filters = 4
@@ -45,10 +51,24 @@ class TestEdgeNN(unittest.TestCase):
         self.assertEqual(sum_output.shape[1:], (256, 256, 1))
 
     def test_train(self) -> None:
-        run.start(self.run_config)
         short_training_run = False
+
+        run.start(self.run_config)
+        model = run.load_model(self.config, self.run_config)
+        run.train(model, self.edge_data, debug=short_training_run, predict_frequency=2)
+        run.end()
+
+    def test_resume(self) -> None:
+        short_training_run = False
+        eager = True
+
+        run.start(self.resume_config)
+        model = run.load_model(self.config, self.resume_config, eager=eager)
         run.train(
-            self.model, self.edge_data, debug=short_training_run, predict_frequency=2
+            model,
+            self.edge_data,
+            debug=short_training_run,
+            predict_frequency=2,
         )
         run.end()
 

@@ -1,0 +1,27 @@
+project: my-test-project
+entity: salehah
+
+
+# run details
+run_name: test_resume
+resume: true
+run_id: 2v2r3tpt
+run_type: training
+
+
+model_filename: model.h5
+
+
+parameters:
+  # training params
+  optimiser: adam
+  train_imgs: null
+  epochs: 100
+  learning_rate: 1e-2
+  batch_size: 3
+  node_pairs_in_batch: 4
+  # model params
+  n_filters: 6
+  batch_norm: false
+  n_conv2_blocks: 2
+  n_conv3_blocks: 2
