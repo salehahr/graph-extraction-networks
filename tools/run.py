@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import os
 import sys
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import wandb
@@ -23,9 +23,16 @@ if TYPE_CHECKING:
     from tools import EdgeDG
 
 
-def get_configs(config_fp: str, run_config_fp: str) -> Tuple[Config, RunConfig]:
+def get_configs(
+    config_fp: str, run_config_fps: Union[List[str], str]
+) -> Tuple[Config, Union[RunConfig, List[RunConfig]]]:
     data_config = Config(config_fp)
-    run_config = RunConfig(run_config_fp, data_config=data_config)
+
+    if isinstance(run_config_fps, str):
+        run_config = RunConfig(run_config_fps, data_config=data_config)
+    else:
+        run_config = [RunConfig(fp, data_config=data_config) for fp in run_config_fps]
+
     return data_config, run_config
 
 
