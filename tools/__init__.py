@@ -8,6 +8,7 @@ from .DataGenerator import (
     get_eedg,
     get_eedg_multiple,
     get_gedg,
+    get_nedg,
 )
 from .EdgeDGSingle import EdgeDGSingle
 from .NetworkType import NetworkType

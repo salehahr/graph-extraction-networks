@@ -6,12 +6,12 @@ import sys
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import wandb
 from keras.callbacks import Callback, ModelCheckpoint
 from wandb.integration.keras import WandbCallback
 
-from model import EdgeNN
-from tools import Config, RunConfig
+import wandb
+from model import EdgeNN, NodesNN
+from tools import Config, NetworkType, RunConfig
 from tools.plots import plot_node_pairs_on_skel
 from tools.postprocessing import classify, smooth
 from tools.TestType import TestType
@@ -19,8 +19,7 @@ from tools.TestType import TestType
 if TYPE_CHECKING:
     import tensorflow as tf
 
-    from model import UNet
-    from tools import EdgeDG
+    from tools import EdgeDG, NodeExtractionDG
 
 
 def get_configs(
@@ -98,31 +97,42 @@ def sweep(
 def load_model(
     config: Config,
     run_config: RunConfig,
-    model_: Optional[EdgeNN] = None,
+    network: NetworkType = NetworkType.EDGE_NN,
+    model_: Optional[Union[EdgeNN, NodesNN]] = None,
     do_sweep: bool = False,
     do_train: bool = True,
     eager: bool = False,
-) -> EdgeNN:
+) -> Union[EdgeNN, NodesNN]:
     """Either initialises a new model or loads an existing model."""
     # initialise model
     params = wandb.config if do_sweep else run_config.parameters
 
     if model_ is None:
-        model_ = EdgeNN(
-            input_size=(*config.img_dims, 1),
-            n_filters=params.n_filters,
-            batch_norm=params.batch_norm,
-            n_conv2_blocks=params.n_conv2_blocks,
-            n_conv3_blocks=params.n_conv3_blocks,
-            pretrained_weights=run_config.pretrained_weights,
-            learning_rate=params.learning_rate,
-            optimiser=params.optimiser,
-            eager=eager,
-        )
+        if network == NetworkType.EDGE_NN:
+            model_ = EdgeNN(
+                input_size=(*config.img_dims, 1),
+                n_filters=params.n_filters,
+                batch_norm=params.batch_norm,
+                n_conv2_blocks=params.n_conv2_blocks,
+                n_conv3_blocks=params.n_conv3_blocks,
+                pretrained_weights=run_config.pretrained_weights,
+                learning_rate=params.learning_rate,
+                optimiser=params.optimiser,
+                eager=eager,
+            )
+        elif network == NetworkType.NODES_NN:
+            model_ = NodesNN(
+                input_size=(*config.img_dims, 1),
+                n_filters=params.n_filters,
+                depth=params.depth,
+                pretrained_weights=run_config.pretrained_weights,
+                eager=eager,
+            )
         model_.build(run_eagerly=eager)
 
     # load weights on resumed run
-    if do_train is True and wandb.run.resumed is True:
+    resumed = False if wandb.run is None else wandb.run.resumed
+    if do_train is True and resumed is True:
         try:
             best_model = wandb.restore(
                 "model-best.h5",
@@ -144,7 +154,7 @@ def load_model(
 
 
 def train(
-    model_: Union[EdgeNN, UNet],
+    model_: Union[EdgeNN, NodesNN],
     data: Dict[TestType, EdgeDG],
     validate: bool = True,
     epochs: Optional[int] = None,
@@ -167,6 +177,17 @@ def train(
         validation_data, steps_in_epoch, max_num_images_val, debug
     )
 
+    if isinstance(model_, EdgeNN):
+        callbacks = [
+            WandbCallback(save_weights_only=True),
+            PredictionCallback(predict_frequency, validation_data),
+            BestPrecisionCallback(),
+        ]
+    elif isinstance(model_, NodesNN):
+        callbacks = [
+            WandbCallback(save_weights_only=True),
+        ]
+
     history = model_.fit(
         x=training_data,
         validation_data=validation_data,
@@ -174,11 +195,7 @@ def train(
         epochs=epochs,
         steps_per_epoch=num_steps_train,
         validation_steps=num_steps_validation,
-        callbacks=[
-            WandbCallback(save_weights_only=True),
-            PredictionCallback(predict_frequency, validation_data),
-            BestPrecisionCallback(),
-        ],
+        callbacks=callbacks,
     )
 
     return history
@@ -204,8 +221,13 @@ def _get_num_steps(
     return num_steps
 
 
-def _get_max_num_steps(max_num_images: int, data_generator: EdgeDG) -> int:
-    num_steps = math.ceil(max_num_images / data_generator.images_in_batch)
+def _get_max_num_steps(
+    max_num_images: int, data_generator: Union[EdgeDG, NodeExtractionDG]
+) -> int:
+    if data_generator.network == NetworkType.EDGE_NN:
+        num_steps = math.ceil(max_num_images / data_generator.images_in_batch)
+    elif data_generator.network == NetworkType.NODES_NN:
+        num_steps = math.ceil(max_num_images / data_generator.batch_size)
 
     # check that the number of steps don't exceed length of the DataGenerator
     return min(num_steps, len(data_generator))

@@ -3,7 +3,7 @@ import shutil
 import unittest
 
 from model import EdgeNN
-from tools import TestType, get_eedg, run
+from tools import NetworkType, TestType, get_eedg, run
 
 
 class TestEdgeNN(unittest.TestCase):
@@ -54,7 +54,9 @@ class TestEdgeNN(unittest.TestCase):
         short_training_run = False
 
         run.start(self.run_config)
-        model = run.load_model(self.config, self.run_config)
+        model = run.load_model(
+            self.config, self.run_config, network=NetworkType.EDGE_NN
+        )
         run.train(model, self.edge_data, debug=short_training_run, predict_frequency=2)
         run.end()
 
@@ -63,7 +65,9 @@ class TestEdgeNN(unittest.TestCase):
         eager = True
 
         run.start(self.resume_config)
-        model = run.load_model(self.config, self.resume_config, eager=eager)
+        model = run.load_model(
+            self.config, self.resume_config, network=NetworkType.EDGE_NN, eager=eager
+        )
         run.train(
             model,
             self.edge_data,
@@ -104,7 +108,9 @@ class TestEdgeNN(unittest.TestCase):
         run.start(self.run_config, is_sweep=True)
         short_training_run = True
 
-        model = run.load_model(self.config, self.run_config, do_sweep=True)
+        model = run.load_model(
+            self.config, self.run_config, network=NetworkType.EDGE_NN, do_sweep=True
+        )
 
         run.train(model, self.edge_data, debug=short_training_run, predict_frequency=2)
         run.end()

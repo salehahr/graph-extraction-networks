@@ -150,10 +150,15 @@ class RunParams(BaseModel):
     learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None
 
+    # general model params
+    n_filters: Optional[int] = None
+
+    # for NodesNN specifically
+    depth: Optional[int] = None
+
     # for EdgeNN specifically
     adjacency_frac: Optional[int] = None
     node_pairs_in_batch: Optional[int] = None
-    n_filters: Optional[int] = None
     batch_norm: bool = True
     n_conv2_blocks: Optional[int] = None
     n_conv3_blocks: Optional[int] = None

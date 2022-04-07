@@ -22,6 +22,23 @@ GraphBatchData = Tuple[tf.Tensor, tf.Tensor, tf.Tensor]
 GraphBatchDatasets = Tuple[tf.data.Dataset, ...]
 
 
+def get_nedg(
+    config: Config,
+    augmented: bool = True,
+    shuffle: bool = True,
+):
+    return {
+        test: NodeExtractionDG(
+            config,
+            config.network.node_extraction,
+            test,
+            augmented=augmented,
+            shuffle=shuffle,
+        )
+        for test in TestType
+    }
+
+
 def get_gedg(
     config: Config,
     batch_size: Optional[int] = None,
@@ -129,6 +146,9 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         self.num_data = num_data
         self.batch_size = config.batch_size
         self.img_dims = config.img_dims
+
+        # network attributes
+        self.network = network.id
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
 
@@ -372,8 +392,9 @@ class EdgeDG(GraphExtractionDG):
         self.config = config
         self.with_path = with_path
 
-        # dimensions
+        # network attributes
         network = config.network.edge_extraction
+        self.network = network.id
         self.input_channels = network.input_channels
         self.output_channels = network.output_channels
 

@@ -1,0 +1,21 @@
+project: my-test-project
+entity: salehah
+
+
+# run details
+run_name: unet_test
+resume: true
+run_id: 15314a3o
+run_type: training
+
+
+parameters:
+  # training params
+  train_imgs: 1000
+  epochs: 150
+  batch_size: 16
+  # model params
+  n_filters: 16
+  depth: 5
+
+sweep_config: null
