@@ -1,10 +1,6 @@
-from typing import Tuple
+from typing import Dict, List, Tuple, Union
 
-from keras.callbacks import ModelCheckpoint
-from tensorflow.keras.callbacks import TensorBoard
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
-from wandb.keras import WandbCallback
+import tensorflow as tf
 
 from model.utils import (
     deconv,
@@ -17,14 +13,17 @@ from model.utils import (
 )
 
 
-class UNet(Model):
+class UNet(tf.keras.models.Model):
     def __init__(
         self,
-        input_size: Tuple[int, int, int],
+        input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
         n_filters: int,
         depth: int = 5,
         pretrained_weights=None,
+        eager: bool = True,
     ):
+        tf.config.run_functions_eagerly(eager)
+
         # define input layer
         x = input_tensor(input_size)  # 256x256x3
 
@@ -47,13 +46,19 @@ class UNet(Model):
     def _get_loss(self):
         return {"final": "sparse_categorical_crossentropy"}
 
-    def build(self):
+    def _define_metrics(self) -> Dict[str, List[tf.keras.metrics.Metric]]:
+        return {"final": [tf.keras.metrics.Accuracy(name="accuracy")]}
+
+    def build(self, **kwargs):
+        self.recompile(**kwargs)
+
+    def recompile(self, **kwargs):
         self.compile(
-            optimizer=Adam(),
+            optimizer=tf.keras.optimizers.Adam(),
             loss=self._get_loss(),
-            metrics=["accuracy"],
+            metrics=self._define_metrics(),
+            **kwargs,
         )
-        self.summary()
 
     @staticmethod
     def _contractive_path(x, n_filters: int, depth: int) -> list:
@@ -87,7 +92,7 @@ class UNet(Model):
 
     @staticmethod
     def checkpoint(filepath, save_frequency="epoch"):
-        return ModelCheckpoint(
+        return tf.keras.callbacks.ModelCheckpoint(
             filepath,
             monitor="epoch_loss",
             verbose=1,
@@ -98,26 +103,27 @@ class UNet(Model):
 
     @staticmethod
     def tensorboard_callback(filepath):
-        return TensorBoard(log_dir=filepath, histogram_freq=1, update_freq="epoch")
-
-    @staticmethod
-    def wandb_callback():
-        return WandbCallback()
+        return tf.keras.callbacks.TensorBoard(
+            log_dir=filepath, histogram_freq=1, update_freq="epoch"
+        )
 
 
 class NodesNN(UNet):
     def __init__(
         self,
-        input_size: Tuple[int, int, int],
+        input_size: Union[Tuple[int, int, int], Tuple[Tuple[int, int], int]],
         n_filters: int,
         depth: int = 5,
         pretrained_weights=None,
+        eager: bool = True,
     ):
         self.node_pos = None
         self.degrees = None
         self.node_types = None
 
-        super(NodesNN, self).__init__(input_size, n_filters, depth, pretrained_weights)
+        super(NodesNN, self).__init__(
+            input_size, n_filters, depth, pretrained_weights, eager
+        )
 
     def _get_outputs(self):
         self.node_pos = single_conv(
@@ -155,6 +161,40 @@ class NodesNN(UNet):
             "node_pos": "binary_crossentropy",
             "degrees": "sparse_categorical_crossentropy",
             "node_types": "sparse_categorical_crossentropy",
+        }
+
+    def _define_metrics(self) -> Dict[str, List[tf.keras.metrics.Metric]]:
+        return {
+            "node_pos": [
+                tf.keras.metrics.BinaryAccuracy(name="accuracy"),
+                tf.keras.metrics.BinaryCrossentropy(name="ce"),
+                tf.keras.metrics.KLDivergence(name="kl"),
+                tf.keras.metrics.MeanAbsoluteError(name="mae"),
+                tf.keras.metrics.MeanAbsolutePercentageError(name="mape"),
+                tf.keras.metrics.MeanSquaredError(name="mse"),
+                tf.keras.metrics.MeanSquaredLogarithmicError(name="msle"),
+                tf.keras.metrics.RootMeanSquaredError(name="rms"),
+            ],
+            "degrees": [
+                tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy"),
+                tf.keras.metrics.SparseCategoricalCrossentropy(name="ce"),
+                tf.keras.metrics.KLDivergence(name="kl"),
+                tf.keras.metrics.MeanAbsoluteError(name="mae"),
+                tf.keras.metrics.MeanAbsolutePercentageError(name="mape"),
+                tf.keras.metrics.MeanSquaredError(name="mse"),
+                tf.keras.metrics.MeanSquaredLogarithmicError(name="msle"),
+                tf.keras.metrics.RootMeanSquaredError(name="rms"),
+            ],
+            "node_types": [
+                tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy"),
+                tf.keras.metrics.SparseCategoricalCrossentropy(name="ce"),
+                tf.keras.metrics.KLDivergence(name="kl"),
+                tf.keras.metrics.MeanAbsoluteError(name="mae"),
+                tf.keras.metrics.MeanAbsolutePercentageError(name="mape"),
+                tf.keras.metrics.MeanSquaredError(name="mse"),
+                tf.keras.metrics.MeanSquaredLogarithmicError(name="msle"),
+                tf.keras.metrics.RootMeanSquaredError(name="rms"),
+            ],
         }
 
 

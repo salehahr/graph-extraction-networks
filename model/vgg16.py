@@ -29,7 +29,10 @@ class VGG16(Model):
         pretrained_weights: Optional[str] = None,
         learning_rate: float = 0.01,
         optimiser: str = "Adam",
+        eager: bool = False,
     ):
+        tf.config.run_functions_eagerly(eager)
+
         self.n_filters = n_filters
         self.batch_norm = batch_norm
         self.n_conv2_blocks = n_conv2_blocks
@@ -128,7 +131,6 @@ class VGG16(Model):
 
     def build(self, **kwargs):
         self.recompile(**kwargs)
-        # self.summary()
 
     def recompile(self, **kwargs):
         metrics = [
@@ -147,7 +149,6 @@ class VGG16(Model):
             optimizer=Adam(learning_rate=self.learning_rate),
             loss="binary_crossentropy",
             metrics=metrics,
-            run_eagerly=False,
             **kwargs,
         )
 
@@ -163,6 +164,7 @@ class EdgeNN(VGG16):
         pretrained_weights: Optional[str] = None,
         learning_rate: float = 0.01,
         optimiser: str = "Adam",
+        eager: bool = False,
     ):
         self._input_sum: tf.Tensor
         self._node_pair: tf.Tensor
@@ -176,6 +178,7 @@ class EdgeNN(VGG16):
             pretrained_weights,
             learning_rate,
             optimiser,
+            eager,
         )
 
     @tf.function

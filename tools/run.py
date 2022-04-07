@@ -101,6 +101,7 @@ def load_model(
     model_: Optional[EdgeNN] = None,
     do_sweep: bool = False,
     do_train: bool = True,
+    eager: bool = False,
 ) -> EdgeNN:
     """Either initialises a new model or loads an existing model."""
     # initialise model
@@ -116,8 +117,9 @@ def load_model(
             pretrained_weights=run_config.pretrained_weights,
             learning_rate=params.learning_rate,
             optimiser=params.optimiser,
+            eager=eager,
         )
-        model_.build()
+        model_.build(run_eagerly=eager)
 
     # load weights on resumed run
     if do_train is True and wandb.run.resumed is True:
@@ -127,7 +129,7 @@ def load_model(
                 run_path=f"{run_config.entity}/{run_config.project}/{run_config.run_id}",
             )
             model_.load_weights(best_model.name)
-            model_.recompile()
+            model_.recompile(run_eagerly=eager)
         except ValueError as ve:
             print(ve)
             print(

@@ -47,7 +47,7 @@ def single_conv(
     x = Conv2D(
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
-        padding="same" if padding is True else None,
+        padding="same" if padding is True else "valid",  # default keras
     )(input_tensor)
 
     if normalise:
