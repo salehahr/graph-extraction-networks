@@ -1,0 +1,26 @@
+project: edge_extraction
+entity: salehah
+
+
+# run details
+run_name: null
+resume: true
+run_id: f743jash
+run_type: training
+
+
+parameters:
+  # training params
+  optimiser: radam
+  train_imgs: 1000
+  epochs: 54
+  learning_rate: 1e-3
+  batch_size: 8
+  node_pairs_in_batch: 4
+  # model params
+  batch_norm: true
+  n_filters: 3
+  n_conv2_blocks: 3
+  n_conv3_blocks: 2
+
+sweep_config: null

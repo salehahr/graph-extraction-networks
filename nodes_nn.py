@@ -4,7 +4,7 @@ if __name__ == "__main__":
     # configs, data generation
     data_config, run_config = run.get_configs(
         "config.yaml",
-        "configs/unet_test.yaml",
+        "configs/unet_baseline.yaml",
     )
     data = get_nedg(data_config)
 
