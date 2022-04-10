@@ -6,7 +6,7 @@ from typing import Any, Iterable, Optional, Tuple, Union
 import yaml
 from pydantic import BaseModel, validator
 
-from tools.data import get_skeletonised_ds
+from tools.data import filter_ds_synth, get_skeletonised_ds
 from tools.NetworkType import NetworkType
 from tools.TestType import TestType
 
@@ -54,6 +54,8 @@ class Config(BaseModel):
     use_small_dataset: bool = False
     max_files: Optional[int] = None
 
+    with_synthetic: Optional[bool] = None
+
     # generated from user input
     img_dims: Optional[Tuple[int, int]] = None
 
@@ -87,13 +89,15 @@ class Config(BaseModel):
     def set_network(cls, v):
         return NNConfig(v)
 
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, with_synthetic: bool = True):
         with open(filepath) as f:
             data = yaml.load(f, Loader=yaml.FullLoader)
 
         super(Config, self).__init__(**data)
 
         self.img_dims = (self.img_length, self.img_length)
+        if self.with_synthetic is None:
+            self.with_synthetic = with_synthetic
 
         # paths
         self.log_path = os.path.join(self.base_path, "logs")
@@ -119,6 +123,11 @@ class Config(BaseModel):
         self.test_ds = self.create_dataset(is_test=True)
         self.num_test = len(self.test_ds)
 
+        if not self.with_synthetic:
+            self.num_validation = len(list(self.validation_ds.as_numpy_iterator()))
+            self.num_train = len(list(self.training_ds.as_numpy_iterator()))
+            self.num_labels = self.num_validation + self.num_train
+
         print(
             f"Total: {self.num_labels} training data --",
             f"[{self.num_train} training]",
@@ -135,11 +144,17 @@ class Config(BaseModel):
 
     @property
     def training_ds(self):
-        return self.dataset.take(self.num_train)
+        ds = self.dataset.take(self.num_train)
+        if not self.with_synthetic:
+            ds = filter_ds_synth(ds)
+        return ds
 
     @property
     def validation_ds(self):
-        return self.dataset.skip(self.num_train)
+        ds = self.dataset.skip(self.num_train)
+        if not self.with_synthetic:
+            ds = filter_ds_synth(ds)
+        return ds
 
 
 class RunParams(BaseModel):

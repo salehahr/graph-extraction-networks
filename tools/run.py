@@ -23,9 +23,11 @@ if TYPE_CHECKING:
 
 
 def get_configs(
-    config_fp: str, run_config_fps: Union[List[str], str]
+    config_fp: str,
+    run_config_fps: Union[List[str], str],
+    with_synthetic: bool = True,
 ) -> Tuple[Config, Union[RunConfig, List[RunConfig]]]:
-    data_config = Config(config_fp)
+    data_config = Config(config_fp, with_synthetic)
 
     if isinstance(run_config_fps, str):
         run_config = RunConfig(run_config_fps, data_config=data_config)

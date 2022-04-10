@@ -35,6 +35,10 @@ def get_skeletonised_ds(
     return ds.shuffle(len(ds), seed=seed, reshuffle_each_iteration=False)
 
 
+def filter_ds_synth(ds: tf.data.Dataset) -> tf.data.Dataset:
+    return ds.filter(lambda x: tf.strings.regex_full_match(x, ".*GRK.*"))
+
+
 def ds_to_list(dataset: tf.data.Dataset) -> List[str]:
     return [f.decode("utf-8") for f in dataset.as_numpy_iterator()]
 
