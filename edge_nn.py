@@ -2,9 +2,7 @@ from tools import NetworkType, get_eedg, run
 
 if __name__ == "__main__":
     # configs
-    data_config, run_config = run.get_configs(
-        "config.yaml", "configs/vgg_mod_large.yaml"
-    )
+    data_config, run_config = run.get_configs("config.yaml", "configs/86ae75jb.yaml")
 
     # generate data
     edge_data = get_eedg(data_config, run_config)

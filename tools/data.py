@@ -9,6 +9,14 @@ from tools.sort import get_sort_indices, sort_list_of_nodes
 from tools.TestType import TestType
 
 
+def get_debug_ds():
+    files_glob = [
+        os.path.join("/graphics/scratch/schuelej/sar/data/debug/*/skeleton/*.png"),
+        os.path.join("/graphics/scratch/schuelej/sar/data/debug/*/*/skeleton/*.png"),
+    ]
+    return tf.data.Dataset.list_files(files_glob, shuffle=False)
+
+
 def get_skeletonised_ds(
     data_path: str, seed: int, is_test: bool = False
 ) -> tf.data.Dataset:

@@ -93,7 +93,12 @@ def get_eedg(
     if validate:
         return {
             test: EdgeDG(
-                config, run_config, with_path=with_path, test_type=test, shuffle=shuffle
+                config,
+                run_config,
+                with_path=with_path,
+                test_type=test,
+                shuffle=shuffle,
+                debug=debug,
             )
             for test in TestType
         }
@@ -119,6 +124,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         test_type: TestType,
         augmented: bool = True,
         shuffle: bool = True,
+        debug: bool = False,
     ):
         # dataset settings
         self.test_type = test_type
@@ -127,7 +133,11 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 
         if test_type == TestType.TRAINING:
             num_data = config.num_train
-            ds = config.training_ds
+            if debug:
+                ds = data_op.get_debug_ds()
+            else:
+                ds = config.training_ds
+
         elif test_type == TestType.VALIDATION:
             num_data = config.num_validation
             ds = config.validation_ds
