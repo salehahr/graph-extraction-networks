@@ -176,7 +176,7 @@ class NodesNN(UNet):
                 tf.keras.metrics.RootMeanSquaredError(name="rms"),
             ],
             "degrees": [
-                tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy"),
+                tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
                 tf.keras.metrics.SparseCategoricalCrossentropy(name="ce"),
                 tf.keras.metrics.KLDivergence(name="kl"),
                 tf.keras.metrics.MeanAbsoluteError(name="mae"),
@@ -186,7 +186,7 @@ class NodesNN(UNet):
                 tf.keras.metrics.RootMeanSquaredError(name="rms"),
             ],
             "node_types": [
-                tf.keras.metrics.SparseCategoricalCrossentropy(name="accuracy"),
+                tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
                 tf.keras.metrics.SparseCategoricalCrossentropy(name="ce"),
                 tf.keras.metrics.KLDivergence(name="kl"),
                 tf.keras.metrics.MeanAbsoluteError(name="mae"),

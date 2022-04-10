@@ -10,14 +10,14 @@ if TYPE_CHECKING:
     from model import EdgeNN
 
 
-def get_edgenn_caller(model_: EdgeNN) -> tf.types.experimental.ConcreteFunction:
+def get_edgenn_caller(model: EdgeNN) -> tf.types.experimental.ConcreteFunction:
     def evaluate(
-        model__: EdgeNN, skel_img: tf.Tensor, node_pos: tf.Tensor, combo_img: tf.Tensor
+        model: EdgeNN, skel_img: tf.Tensor, node_pos: tf.Tensor, combo_img: tf.Tensor
     ):
-        return model__((skel_img, node_pos, combo_img), training=False)
+        return model((skel_img, node_pos, combo_img), training=False)
 
     return tf.function(evaluate).get_concrete_function(
-        model=model_,
+        model=model,
         skel_img=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.float32),
         node_pos=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.uint8),
         combo_img=tf.TensorSpec(shape=(None, 256, 256), dtype=tf.int64),
