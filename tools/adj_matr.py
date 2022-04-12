@@ -1,11 +1,17 @@
-from typing import Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 
 from tools.plots import plot_adj_matr
 
+if TYPE_CHECKING:
+    from tools import AdjMatrPredictor, GraphExtractionDG
 
+
+# noinspection PyPep8Naming
 def transform_A(A: np.ndarray, new_indices: np.ndarray) -> np.ndarray:
     """Generates new adjacency matrix based on new node positions."""
     num_nodes = A.shape[0]
@@ -14,6 +20,7 @@ def transform_A(A: np.ndarray, new_indices: np.ndarray) -> np.ndarray:
     return P @ A @ np.transpose(P)
 
 
+# noinspection PyPep8Naming
 def transform_adj_matr(A: tf.Tensor, new_indices: tf.Tensor) -> tf.RaggedTensor:
     """Generates new adjacency matrix based on new node positions."""
     I = tf.eye(tf.shape(A)[0], dtype=A.dtype)
@@ -28,12 +35,14 @@ def adj_matr_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
+# noinspection PyPep8Naming
 @tf.function
 def _update(combos: tf.Tensor, adjacencies: tf.Tensor, A: tf.Variable):
     A.scatter_nd_update(combos, adjacencies)
     A.scatter_nd_update(tf.reverse(combos, axis=[-1]), adjacencies)
 
 
+# noinspection PyPep8Naming
 def get_update_function(A: tf.Variable) -> tf.types.experimental.ConcreteFunction:
     return _update.get_concrete_function(
         combos=tf.TensorSpec(shape=(None, 2), dtype=tf.int64),
@@ -63,3 +72,21 @@ def preview(
     plot_adj_matr(
         skel_img.numpy(), pos_list_xy.numpy(), adj_matr.value().numpy(), title=title
     )
+
+
+def plot_in_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
+    # leerlauf
+    print("Leerlauf.")
+    edge_nn_input, _, _ = graph_data.get_single_data_point(0)
+    predictor.predict(edge_nn_input)
+
+    # only save the matrices/skel_imgs, plot later
+    print("Start of loop.")
+    plot_array = []
+    for i in range(0, 6):
+        edge_nn_inputs, _, _ = graph_data.get_single_data_point(i)
+        plot_data = predictor.predict(edge_nn_inputs)
+        plot_array.append(plot_data)
+
+    for pd in plot_array:
+        preview(*pd)
