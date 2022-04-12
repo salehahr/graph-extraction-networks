@@ -35,6 +35,11 @@ def adj_matr_to_vec(adj_matr: np.ndarray) -> np.ndarray:
     return upper_tri_matr[upper_tri_idxs]
 
 
+@tf.function(input_signature=[tf.TensorSpec(shape=None, dtype=tf.int32)])
+def tf_A_vec(adj_matr: tf.Tensor) -> tf.Tensor:
+    return tf.numpy_function(adj_matr_to_vec, inp=[adj_matr], Tout=tf.int32)
+
+
 # noinspection PyPep8Naming
 @tf.function
 def _update(combos: tf.Tensor, adjacencies: tf.Tensor, A: tf.Variable):
@@ -74,11 +79,15 @@ def preview(
     )
 
 
-def plot_in_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
+def leerlauf(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
     # leerlauf
     print("Leerlauf.")
     edge_nn_input, _, _ = graph_data.get_single_data_point(0)
     predictor.predict(edge_nn_input)
+
+
+def plot_in_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
+    leerlauf(predictor, graph_data)
 
     # only save the matrices/skel_imgs, plot later
     print("Start of loop.")
@@ -90,3 +99,14 @@ def plot_in_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
 
     for pd in plot_array:
         preview(*pd)
+
+
+def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
+    leerlauf(predictor, graph_data)
+
+    print("Start of loop.")
+    for i in range(len(graph_data)):
+        combo_img, A_true, filepath = graph_data.get_single_data_point(i)
+        A_pred, _, _ = predictor.predict(combo_img)
+        metrics = predictor.metrics(A_true[0].to_tensor())
+        print(metrics)

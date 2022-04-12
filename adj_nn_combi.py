@@ -15,4 +15,7 @@ if __name__ == "__main__":
     adj_matr_pred = AdjMatrPredictor(model, run_config.num_neighbours)
 
     # predict
-    adj_matr.plot_in_loop(adj_matr_pred, graph_data)
+    adj_matr.predict_loop(adj_matr_pred, graph_data)
+
+    # preview
+    # adj_matr.plot_in_loop(adj_matr_pred, graph_data)

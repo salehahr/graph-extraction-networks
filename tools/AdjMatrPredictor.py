@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from time import time
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 import tensorflow as tf
 
@@ -9,7 +9,7 @@ import tools.combinations as combination_op
 import tools.data as data_op
 import tools.evaluate
 import tools.neighbours
-from tools.adj_matr import get_placeholders, get_update_function, preview
+from tools.adj_matr import get_placeholders, get_update_function, preview, tf_A_vec
 from tools.timer import timer
 
 if TYPE_CHECKING:
@@ -70,6 +70,22 @@ class AdjMatrPredictor:
         # flags
         self._stop_iterate: tf.bool
 
+        # metrics
+        self._tp = tf.keras.metrics.TruePositives()
+        self._tn = tf.keras.metrics.TrueNegatives()
+        self._fp = tf.keras.metrics.FalsePositives()
+        self._fn = tf.keras.metrics.FalseNegatives()
+        self._precision = tf.keras.metrics.Precision()
+        self._recall = tf.keras.metrics.Recall()
+        self._metrics = [
+            self._tp,
+            self._tn,
+            self._fp,
+            self._fn,
+            self._precision,
+            self._recall,
+        ]
+
     @property
     def num_combos(self) -> tf.Tensor:
         return tf.shape(self._combos)[0]
@@ -111,6 +127,10 @@ class AdjMatrPredictor:
 
         # reset flags
         self._stop_iterate: tf.bool = tf.constant(False)
+
+        # reset metrics
+        for metric in self._metrics:
+            metric.reset_state()
 
     @timer
     def predict(
@@ -336,3 +356,26 @@ class AdjMatrPredictor:
             self._adjacency_probs,
             self._degrees_lookup.value(),
         )
+
+    # noinspection PyPep8Naming
+    def metrics(self, A_true: tf.Tensor) -> Dict[str : tf.Tensor]:
+        at_vec = tf.constant(tf_A_vec(A_true))
+        ap_vec = tf.constant(tf_A_vec(tf.constant(self._A, dtype=tf.int32)))
+
+        tp = self._tp(at_vec, ap_vec)
+        tn = self._tn(at_vec, ap_vec)
+        fp = self._fp(at_vec, ap_vec)
+        fn = self._fn(at_vec, ap_vec)
+        precision = self._precision(at_vec, ap_vec)
+        recall = self._recall(at_vec, ap_vec)
+        f1 = 2 * precision * recall / (precision + recall)
+
+        return {
+            "tp": int(tp),
+            "tn": int(tn),
+            "fp": int(fp),
+            "fn": int(fn),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(f1),
+        }
