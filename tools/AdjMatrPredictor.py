@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import time
 from typing import TYPE_CHECKING, Optional, Tuple
 
 import tensorflow as tf
@@ -116,7 +117,8 @@ class AdjMatrPredictor:
         self,
         input_data: Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
         do_preview: bool = False,
-    ) -> Tuple[tf.Variable, tf.Tensor, tf.Tensor]:
+        **kwargs,
+    ) -> Tuple:
         """Main prediction function."""
 
         self._init_prediction(*input_data)
@@ -134,6 +136,7 @@ class AdjMatrPredictor:
 
         return self._A, self._skel_img, self._pos_list_xy
 
+    # noinspection PyUnreachableCode
     def _get_predictions(self) -> Tuple[tf.Tensor, tf.Tensor]:
         """Obtains the model prediction on current neighbour node combinations.."""
         current_batch = data_op.get_combo_inputs(
@@ -142,7 +145,12 @@ class AdjMatrPredictor:
             self._combos,
             self._pos_list_xy,
         )
+
+        if __debug__:
+            t_start = time()
         probabilities = self._predict_func(*current_batch)
+        if __debug__:
+            print(f"\tmodel.__call__:\t{time() - t_start:.3f} s")
         adj, adj_probs = tools.evaluate.classify(probabilities)
 
         # expand dimensions of (adj, adj_probs) if their lengths are one
