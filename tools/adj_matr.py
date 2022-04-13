@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
+from tools.logger import Logger
 from tools.plots import plot_adj_matr
 
 if TYPE_CHECKING:
@@ -104,9 +105,13 @@ def plot_in_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
 def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
     leerlauf(predictor, graph_data)
 
+    metric_headers = ["tp", "tn", "fp", "fn", "precision", "recall", "f1"]
+    logger = Logger(f"adj_pred-k{predictor.k0}.csv", headers=metric_headers)
+
     print("Start of loop.")
     for i in range(len(graph_data)):
-        combo_img, A_true, filepath = graph_data.get_single_data_point(i)
-        A_pred, _, _ = predictor.predict(combo_img)
+        combo_img, A_true, img = graph_data.get_single_data_point(i)
+        A_pred, _, _, time = predictor.predict(combo_img, with_time=True)
+
         metrics = predictor.metrics(A_true[0].to_tensor())
-        print(metrics)
+        logger.write(img, metrics, num_nodes=predictor.num_nodes, time=time)

@@ -87,6 +87,15 @@ class AdjMatrPredictor:
         ]
 
     @property
+    def k0(self) -> int:
+        """Initial num. neighbours"""
+        return int(self._init_num_neighbours)
+
+    @property
+    def num_nodes(self) -> int:
+        return int(tf.shape(self._pos_list_xy)[0])
+
+    @property
     def num_combos(self) -> tf.Tensor:
         return tf.shape(self._combos)[0]
 
