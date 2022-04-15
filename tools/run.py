@@ -12,6 +12,7 @@ from wandb.integration.keras import WandbCallback
 import wandb
 from model import EdgeNN, NodesNN
 from tools import Config, NetworkType, RunConfig
+from tools.logger import Logger
 from tools.plots import plot_node_pairs_on_skel
 from tools.postprocessing import classify, smooth
 from tools.TestType import TestType
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
     import tensorflow as tf
 
     from tools import EdgeDG, NodeExtractionDG
-    from tools.logger import Logger
 
 
 def get_configs(
@@ -346,8 +346,23 @@ def increment_step(step_num: int, id_in_batch: int, batch_size: int) -> Tuple[in
     return step_num, id_in_batch
 
 
-def evaluate(model_: EdgeNN, data: EdgeDG, name: str, logger: Logger):
-    model_.evaluate(data, return_dict=True, callbacks=[LoggerCallback(name, logger)])
+def evaluate(
+    model_: EdgeNN,
+    data: EdgeDG,
+    name: str,
+    metric_headers: List[str],
+    network: NetworkType,
+):
+    logger = Logger(
+        f"eval_edge-{name}.csv",
+        headers=metric_headers,
+        network=network,
+    )
+    model_.evaluate(
+        data,
+        return_dict=True,
+        callbacks=[LoggerCallback(logger)],
+    )
 
 
 def end() -> None:
@@ -385,11 +400,10 @@ class PredictionCallback(Callback):
 
 
 class LoggerCallback(Callback):
-    def __init__(self, name: str, logger: Logger):
+    def __init__(self, logger: Logger):
         super().__init__()
 
         self._logger = logger
-        self._name = name
 
     def on_test_batch_end(self, batch, logs=None):
         self._logger.write(logs, batch=batch)
