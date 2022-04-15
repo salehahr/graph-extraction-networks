@@ -107,7 +107,10 @@ def load_model(
 ) -> Union[EdgeNN, NodesNN]:
     """Either initialises a new model or loads an existing model."""
     # initialise model
-    params = wandb.config if do_sweep else run_config.parameters
+    if do_train and do_sweep:
+        params = wandb.config
+    else:
+        params = run_config.parameters
 
     if model_ is None:
         if network == NetworkType.EDGE_NN:

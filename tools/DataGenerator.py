@@ -85,10 +85,14 @@ def get_eedg(
     with_path: Optional[bool] = False,
     validate: bool = True,
     debug: bool = False,
-) -> Dict[TestType, EdgeDG]:
+    test: bool = False,
+) -> Union[EdgeDG, Dict[TestType, EdgeDG]]:
     """Returns training/validation data for Edge NN."""
     # don't shuffle dataset debug mode
     shuffle = not debug
+    if test:
+        validate = False
+        shuffle = False
 
     if validate:
         return {
@@ -102,6 +106,14 @@ def get_eedg(
             )
             for test in TestType
         }
+    elif test:
+        return EdgeDG(
+            config,
+            run_config,
+            with_path=with_path,
+            test_type=TestType.TESTING,
+            shuffle=shuffle,
+        )
     else:
         return {
             TestType.TRAINING: EdgeDG(

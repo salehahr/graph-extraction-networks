@@ -219,6 +219,10 @@ def get_reduced_node_combinations(
     adj_combos = [pair for (pair, adj) in adjacencies if adj == 1]
     non_adj_combos = [pair for (pair, adj) in adjacencies if adj == 0]
 
+    # use random combinations when testing
+    if test_type == TestType.TESTING:
+        shuffle = True
+
     if shuffle is True:
         np.random.shuffle(adj_combos)
         np.random.shuffle(non_adj_combos)
@@ -226,6 +230,7 @@ def get_reduced_node_combinations(
     # training ds: 1 to 1 ratio of adjacent and non-adjacent nodes
     if (
         test_type == TestType.TRAINING
+        or test_type == TestType.TESTING
         or adjacency_fraction is None
         or adjacency_fraction == 0.5
     ):

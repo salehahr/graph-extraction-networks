@@ -161,9 +161,10 @@ class RunParams(BaseModel):
     # general run params
     optimiser: Optional[str] = "adam"
     train_imgs: Optional[int]
-    epochs: int
+    epochs: Optional[int]
     learning_rate: float = 0.001  # keras.Adam default
     batch_size: Optional[int] = None
+    job_type: Optional[str]
 
     # general model params
     n_filters: Optional[int] = None
@@ -174,7 +175,7 @@ class RunParams(BaseModel):
     # for EdgeNN specifically
     adjacency_frac: Optional[int] = None
     node_pairs_in_batch: Optional[int] = None
-    batch_norm: bool = True
+    batch_norm: Optional[bool] = True
     n_conv2_blocks: Optional[int] = None
     n_conv3_blocks: Optional[int] = None
 
@@ -209,7 +210,7 @@ class RunConfig(BaseModel):
     def set_run_type(cls, v: str) -> TestType:
         if v == "train" or v == "training":
             return TestType.TRAINING
-        elif v == "test" or v == "testing":
+        elif v in ["test", "testing", "evaluate", "evaluation", "eval"]:
             return TestType.TESTING
         else:
             raise Exception
@@ -228,6 +229,9 @@ class RunConfig(BaseModel):
         self.node_pairs_in_batch = self.parameters.node_pairs_in_batch
 
         self.run_name = name if name is not None else self.run_name
+        self.parameters.job_type = (
+            "training" if self.run_type == TestType.TRAINING else "evaluation"
+        )
 
         if self.pretrained_weights:
             if data_config.base_path not in self.pretrained_weights:
@@ -259,3 +263,17 @@ class RunConfig(BaseModel):
     @property
     def node_pairs_in_image(self) -> int:
         return self.node_pairs_in_batch
+
+    def set_evaluate(self, eval_config: RunConfig) -> None:
+        """Set to evaluate mode."""
+        self.run_name = f"ev_{eval_config.run_name}"
+        self.run_type = eval_config.run_type
+        self.parameters.job_type = eval_config.parameters.job_type
+        self.resume = eval_config.resume
+
+        self.batch_size = eval_config.batch_size
+        self.node_pairs_in_batch = eval_config.node_pairs_in_batch
+        self.parameters.train_imgs = None
+
+    def set_pretrained_weights(self, weights: str) -> None:
+        self.pretrained_weights = weights
