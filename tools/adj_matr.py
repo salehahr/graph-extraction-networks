@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from tools.logger import Logger
+from tools.NetworkType import NetworkType
 from tools.plots import plot_adj_matr
 
 if TYPE_CHECKING:
@@ -106,7 +107,11 @@ def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
     leerlauf(predictor, graph_data)
 
     metric_headers = ["tp", "tn", "fp", "fn", "precision", "recall", "f1"]
-    logger = Logger(f"adj_pred-k{predictor.k0}.csv", headers=metric_headers)
+    logger = Logger(
+        f"adj_pred-k{predictor.k0}.csv",
+        headers=metric_headers,
+        network=NetworkType.ADJ_MATR_NN,
+    )
 
     print("Start of loop.")
     for i in range(len(graph_data)):
@@ -114,4 +119,4 @@ def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
         A_pred, _, _, time = predictor.predict(combo_img, with_time=True)
 
         metrics = predictor.metrics(A_true[0].to_tensor())
-        logger.write(img, metrics, num_nodes=predictor.num_nodes, time=time)
+        logger.write(metrics, img_fp=img, num_nodes=predictor.num_nodes, time=time)

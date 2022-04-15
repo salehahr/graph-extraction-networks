@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     import tensorflow as tf
 
     from tools import EdgeDG, NodeExtractionDG
+    from tools.logger import Logger
 
 
 def get_configs(
@@ -346,6 +347,10 @@ def increment_step(step_num: int, id_in_batch: int, batch_size: int) -> Tuple[in
     return step_num, id_in_batch
 
 
+def evaluate(model_: EdgeNN, data: EdgeDG, name: str, logger: Logger):
+    model_.evaluate(data, return_dict=True, callbacks=[LoggerCallback(name, logger)])
+
+
 def end() -> None:
     wandb.finish()
 
@@ -378,6 +383,17 @@ class PredictionCallback(Callback):
                 self.validation_data,
                 description=f"Prediction on epoch {epoch}/{self.total_epochs}.",
             )
+
+
+class LoggerCallback(Callback):
+    def __init__(self, name: str, logger: Logger):
+        super().__init__()
+
+        self._logger = logger
+        self._name = name
+
+    def on_test_batch_end(self, batch, logs=None):
+        self._logger.write(logs, batch=batch)
 
 
 class BestPrecisionCallback(ModelCheckpoint):
