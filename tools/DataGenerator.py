@@ -459,7 +459,7 @@ class EdgeDG(GraphExtractionDG):
 
             # there should be enough combos to create a batch
             num_nodes = tf.shape(pos_list)[0]
-            combos = self._get_combos(num_nodes, adj_matr)
+            combos = self._get_combos(num_nodes, adj_matr, seed=item)
             self._assert_enough_combos(combos, item, i, filepaths[i], num_images)
 
             # iterate over node combinations (self.node_pairs_in_image)
@@ -512,7 +512,9 @@ class EdgeDG(GraphExtractionDG):
                 node_pair_imgs,
             ), adjacencies
 
-    def _get_combos(self, num_nodes: tf.Tensor, adj_matr: tf.Tensor) -> tf.Tensor:
+    def _get_combos(
+        self, num_nodes: tf.Tensor, adj_matr: tf.Tensor, seed: int
+    ) -> tf.Tensor:
         # shuffle before batching -- todo: set seed for np.random
         combos = data_op.get_all_node_combinations(tf.cast(num_nodes, tf.int64))
         combos = data_op.get_reduced_node_combinations(
@@ -521,6 +523,7 @@ class EdgeDG(GraphExtractionDG):
             shuffle=self.shuffle,
             test_type=self.test_type,
             adjacency_fraction=self.config.adjacency_fraction,
+            seed=seed,
         )
         return combos
 

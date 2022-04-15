@@ -209,6 +209,7 @@ def get_reduced_node_combinations(
     shuffle: bool = True,
     test_type: TestType = TestType.TRAINING,
     adjacency_fraction: Optional[float] = None,
+    seed: Optional = None,
 ) -> tf.Tensor:
     """Returns a dataset of node combinations that have equal amounts of
     adjacent and non-adjacent node pairs. The dataset elements are
@@ -224,6 +225,7 @@ def get_reduced_node_combinations(
         shuffle = True
 
     if shuffle is True:
+        np.random.seed(seed)
         np.random.shuffle(adj_combos)
         np.random.shuffle(non_adj_combos)
 
