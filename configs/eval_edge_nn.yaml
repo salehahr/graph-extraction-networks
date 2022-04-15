@@ -1,0 +1,16 @@
+project: edge_extraction
+entity: salehah
+
+
+# run details
+run_name: null
+resume: false
+run_id: null
+run_type: testing
+
+
+parameters:
+  batch_size: 4
+  node_pairs_in_batch: 4
+
+sweep_config: null

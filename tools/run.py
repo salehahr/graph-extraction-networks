@@ -62,7 +62,6 @@ def start(
         reinit=reinit,
         id=id_,
     )
-    # wandb.run.define_metric("val_precision", summary="best", goal="maximize")
 
     best_model_fp = os.path.join(wandb.run.dir, "model-best.h5")
     wandb.save(glob_str=best_model_fp, base_path=wandb.run.dir, policy="live")
