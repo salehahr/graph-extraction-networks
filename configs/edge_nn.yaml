@@ -9,7 +9,7 @@ run_id: null
 run_type: training
 
 
-pretrained_weights: edgenn-2pik0ra1-epoch43-val_pec-0.9851.h5
+pretrained_weights: edgenn-1m3yxeop-epoch109.h5
 num_neighbours: 8
 
 parameters:
