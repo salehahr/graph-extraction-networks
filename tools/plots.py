@@ -252,7 +252,7 @@ def get_subplot_id(row, col, num_cols):
     return col + 1 + num_cols * row
 
 
-def _lighten_skel_img(img_skel: np.ndarray, black_to_grey: float = 0.7) -> np.ndarray:
+def lighten_skel_img(img_skel: np.ndarray, black_to_grey: float = 0.7) -> np.ndarray:
     img = img_skel.copy() / 2
 
     ids = np.argwhere(img_skel == 0)
@@ -282,7 +282,7 @@ def plot_adj_matr(
     :param with_numbers: whether to display node IDs in plot
     :param title: title of the plot
     """
-    img = _lighten_skel_img(img_skel)
+    img = lighten_skel_img(img_skel)
 
     img_height = img.shape[0]
     pos_dict = {i: [x, img_height - y] for i, [x, y] in enumerate(pos)}
@@ -397,29 +397,64 @@ def display_single_output(display_list: list, big_title: str):
     plt.show()
 
 
+def _get_prediction_images(
+    model: tf.keras.models.Model, data_generator, batch: int = 0, id_in_batch: int = 0
+):
+    input_images, masks = data_generator[batch]
+    pred_masks = model.predict(input_images)
+
+    input_im = input_images[id_in_batch].numpy()
+    input_im = lighten_skel_img(input_im)[:, :, :3]
+
+    gt_output_matrices = {
+        attr: masks[i][id_in_batch].numpy()
+        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
+    }
+    gt_imgs = classifier_preview(gt_output_matrices, input_im * 255)
+
+    pred_output_matrices = {
+        attr: classify(pred_masks[i][id_in_batch])[0]
+        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
+    }
+    pred_imgs = classifier_preview(pred_output_matrices, input_im * 255)
+
+    return input_im, gt_imgs, pred_imgs
+
+
+def save_prediction_images(
+    model: tf.keras.models.Model,
+    data_generator,
+    batch: int = 0,
+    id_in_batch: int = 0,
+    prefix: str = None,
+):
+    input_image, gt_output_images, pred_output_images = _get_prediction_images(
+        model, data_generator, batch
+    )
+
+    gt_prefix = f"data/b{batch}-{id_in_batch}"
+    pred_prefix = f"{prefix}-b{batch}-{id_in_batch}"
+
+    input_image = (input_image * 255).astype(np.uint8)
+    cv2.imwrite(f"data/b{batch}-{id_in_batch}-input.png", input_image)
+
+    for attr, img in gt_output_images.items():
+        cv2.imwrite(f"{gt_prefix}-gt-{attr}.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(
+            f"{pred_prefix}-pred-{attr}.png",
+            cv2.cvtColor(pred_output_images[attr], cv2.COLOR_RGB2BGR),
+        )
+
+
 def show_predictions(
     model: tf.keras.models.Model,
     data_generator,
     batch: int = 0,
     filepath: str = None,
 ):
-    input_images, masks = data_generator[batch]
-    pred_masks = model.predict(input_images)
-
-    b_id = 0
-    input_image = input_images[b_id].numpy()
-
-    gt_output_matrices = {
-        attr: masks[i][b_id].numpy()
-        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
-    }
-    gt_output_images = classifier_preview(gt_output_matrices, input_image * 255)
-
-    pred_output_matrices = {
-        attr: classify(pred_masks[i][b_id])[0]
-        for i, attr in enumerate(["node_pos", "degrees", "node_types"])
-    }
-    pred_output_images = classifier_preview(pred_output_matrices, input_image * 255)
+    input_image, gt_output_images, pred_output_images = _get_prediction_images(
+        model, data_generator, batch
+    )
 
     plt.subplot(331)
     plot_img(input_image, cmap="gray")

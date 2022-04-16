@@ -1,4 +1,5 @@
 from tools import NetworkType, RunConfig, get_eedg, get_nedg, run
+from tools.plots import save_prediction_images
 
 network = NetworkType.NODES_NN
 model_ids, metric_headers, test_data = [], [], []
@@ -43,6 +44,13 @@ if __name__ == "__main__":
         )
         assert model.pretrained
 
+        # visualise the predictions
+        for batch_num in [0, 2, 5, 7]:
+            save_prediction_images(
+                model, test_data, batch=batch_num, prefix=f"data/{id_}"
+            )
+
+        # metric evaluations
         run.evaluate(
             model,
             test_data,

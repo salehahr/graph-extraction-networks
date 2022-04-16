@@ -49,7 +49,12 @@ def classifier_preview(output_matrices: dict, img_skel: np.ndarray) -> dict:
     Takes the classifier matrices as an input and generates for each matrix
     the corresponding visualisation.
     """
-    base_img = cv2.cvtColor(img_skel, cv2.COLOR_GRAY2BGR).astype(np.uint8)
+
+    if img_skel.shape[-1] > 1:
+        base_img = img_skel.astype(np.uint8)
+    else:
+        base_img = cv2.cvtColor(img_skel, cv2.COLOR_GRAY2BGR).astype(np.uint8)
+
     data_dict = {
         attr: {"matrix": matr.squeeze(), "colours": colour_enums[attr]}
         for attr, matr in output_matrices.items()
