@@ -26,17 +26,27 @@ def get_nedg(
     config: Config,
     augmented: bool = True,
     shuffle: bool = True,
+    test: bool = False,
 ):
-    return {
-        test: NodeExtractionDG(
+    if test:
+        return NodeExtractionDG(
             config,
             config.network.node_extraction,
-            test,
-            augmented=augmented,
-            shuffle=shuffle,
+            TestType.TESTING,
+            augmented=False,
+            shuffle=False,
         )
-        for test in TestType
-    }
+    else:
+        return {
+            test_type: NodeExtractionDG(
+                config,
+                config.network.node_extraction,
+                test_type,
+                augmented=augmented,
+                shuffle=shuffle,
+            )
+            for test_type in TestType
+        }
 
 
 def get_gedg(
