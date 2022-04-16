@@ -63,6 +63,10 @@ class VGG16(Model):
             self.pretrained = False
             self.weights_path = None
 
+    @property
+    def num_trainable_params(self) -> tf.Tensor:
+        return tf.reduce_sum([tf.reduce_prod(v.shape) for v in self.trainable_weights])
+
     def _set_optimiser(self, optimiser: str):
         optimiser = optimiser.lower()
 

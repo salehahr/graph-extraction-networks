@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List, Tuple, Union
 
 import tensorflow as tf
@@ -37,8 +38,17 @@ class UNet(tf.keras.models.Model):
         super(UNet, self).__init__(inputs=x, outputs=self._get_outputs())
 
         # load pretrained weights
-        if pretrained_weights:
+        if pretrained_weights is not None and os.path.isfile(pretrained_weights):
+            self.pretrained = True
+            self.weights_path = pretrained_weights
             self.load_weights(pretrained_weights)
+        else:
+            self.pretrained = False
+            self.weights_path = None
+
+    @property
+    def num_trainable_params(self) -> tf.Tensor:
+        return tf.reduce_sum([tf.reduce_prod(v.shape) for v in self.trainable_weights])
 
     def _get_outputs(self):
         return self.final_layer

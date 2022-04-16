@@ -354,7 +354,7 @@ def evaluate(
     network: NetworkType,
 ):
     logger = Logger(
-        f"eval_edge-{name}.csv",
+        f"eval_edge-{name}-{model_.num_trainable_params.numpy():d}.csv",
         headers=metric_headers,
         network=network,
     )
