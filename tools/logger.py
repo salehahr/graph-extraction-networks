@@ -57,6 +57,8 @@ class Logger:
                 data_str = self._data_to_str_adj_matr(img_fp, data, num_nodes, time)
             elif self._network == NetworkType.EDGE_NN:
                 data_str = self._data_to_str_edge(batch, data)
+            elif self._network == NetworkType.NODES_NN:
+                data_str = self._data_to_str_nodes(batch, data)
             f.write(data_str)
 
     def _data_to_str_adj_matr(
@@ -83,6 +85,10 @@ class Logger:
             + [str(int(data[h])) for h in self._metric_headers[:4]]
             + [f"{data[h]:.5f}" for h in self._metric_headers[4:]]
         )
+        return self._data_string(l_data)
+
+    def _data_to_str_nodes(self, batch: int, data: Dict[str, float]) -> str:
+        l_data = [str(batch)] + [str(data[h]) for h in self._metric_headers]
         return self._data_string(l_data)
 
     def _data_string(self, l_strings: list) -> str:

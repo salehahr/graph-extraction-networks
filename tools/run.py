@@ -353,8 +353,9 @@ def evaluate(
     metric_headers: List[str],
     network: NetworkType,
 ):
+    prefix = "eval_edge" if network == NetworkType.EDGE_NN else "eval_nodes"
     logger = Logger(
-        f"eval_edge-{name}-{model_.num_trainable_params.numpy():d}.csv",
+        f"{prefix}-{name}-{model_.num_trainable_params.numpy():d}.csv",
         headers=metric_headers,
         network=network,
     )
