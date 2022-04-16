@@ -3,9 +3,9 @@ entity: salehah
 
 
 # run details
-run_name: baseline_ss
-resume: false
-run_id: null
+run_name: unet_4f
+resume: true
+run_id: 91pmt9xd
 run_type: training
 
 
@@ -15,7 +15,7 @@ parameters:
   epochs: 200
   batch_size: 16
   # model params
-  n_filters: 64
+  n_filters: 4
   depth: 5
 
 sweep_config: null

@@ -1,0 +1,15 @@
+project: node_extraction
+entity: salehah
+
+
+# run details
+run_name: null
+resume: false
+run_id: null
+run_type: testing
+
+
+parameters:
+  batch_size: 16
+
+sweep_config: null

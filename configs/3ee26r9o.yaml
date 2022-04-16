@@ -3,19 +3,19 @@ entity: salehah
 
 
 # run details
-run_name: baseline
+run_name: unet_16f
 resume: true
-run_id: 1izhg74a
+run_id: 3ee26r9o
 run_type: training
 
 
 parameters:
   # training params
-  train_imgs: 2000
+  train_imgs: null
   epochs: 200
   batch_size: 16
   # model params
-  n_filters: 64
+  n_filters: 16
   depth: 5
 
 sweep_config: null

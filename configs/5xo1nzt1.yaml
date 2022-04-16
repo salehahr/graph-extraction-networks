@@ -3,9 +3,9 @@ entity: salehah
 
 
 # run details
-run_name: b_16
-resume: false
-run_id: null
+run_name: baseline
+resume: true
+run_id: 5xo1nzt1
 run_type: training
 
 
@@ -15,7 +15,7 @@ parameters:
   epochs: 200
   batch_size: 16
   # model params
-  n_filters: 16
+  n_filters: 64
   depth: 5
 
 sweep_config: null
