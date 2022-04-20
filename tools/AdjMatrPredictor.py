@@ -14,6 +14,7 @@ from tools.timer import timer
 
 if TYPE_CHECKING:
     from model import EdgeNN
+    from tools.logger import Logger
 
 
 class AdjMatrPredictor:
@@ -64,8 +65,9 @@ class AdjMatrPredictor:
         """Degrees of each node in self._nodes."""
         self._node_degrees: tf.Tensor
 
-        # lookup table
+        # lookup table, logger
         self._degrees_lookup: tf.Variable
+        self.logger: Optional[Logger]
 
         # flags
         self._stop_iterate: tf.bool
