@@ -120,3 +120,12 @@ def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
 
         metrics = predictor.metrics(A_true[0].to_tensor())
         logger.write(metrics, img_fp=img, num_nodes=predictor.num_nodes, time=time)
+
+
+def predict_first_batch(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
+    combo_img, A_true, img = graph_data.get_single_data_point(4)
+
+    for i in range(5):
+        predictor._init_prediction(*combo_img)
+
+    predictor._adjacency_probs, predictor._adjacencies

@@ -14,6 +14,9 @@ if __name__ == "__main__":
     assert model.pretrained is True
     adj_matr_pred = AdjMatrPredictor(model, run_config.num_neighbours)
 
+    # predict first batch only
+    adj_matr.predict_first_batch(adj_matr_pred, graph_data)
+
     # predict
     adj_matr.predict_loop(adj_matr_pred, graph_data)
 
