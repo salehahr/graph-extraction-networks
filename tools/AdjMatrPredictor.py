@@ -143,6 +143,22 @@ class AdjMatrPredictor:
         for metric in self._metrics:
             metric.reset_state()
 
+    def predict_batch(
+        self, input_data: Tuple[tf.Tensor, tf.Tensor, tf.Tensor], **kwargs
+    ) -> float:
+        """Runs prediction only over one batch of knn pair combinations.
+        Returns the time taken (neglecting the prediction made
+        when graph tracing occurs)."""
+        # with tracing
+        self._init_prediction(*input_data)
+
+        # without tracing
+        self._init_prediction(*input_data)
+
+        self._update_func(self._combos, self._adjacencies, self._A)
+
+        return self.logger.average_time(2)
+
     @timer
     def predict(
         self,
@@ -181,7 +197,12 @@ class AdjMatrPredictor:
             t_start = time()
         probabilities = self._predict_func(*current_batch)
         if __debug__:
-            print(f"\tmodel.__call__:\t{time() - t_start:.3f} s")
+            t_elapsed = time() - t_start
+            # print(f"\tmodel.__call__:\t{t_elapsed:.6f} s")
+
+            if self.logger:
+                self.logger.times.append(t_elapsed)
+
         adj, adj_probs = tools.evaluate.classify(probabilities)
 
         # expand dimensions of (adj, adj_probs) if their lengths are one

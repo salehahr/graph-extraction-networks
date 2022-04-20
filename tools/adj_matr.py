@@ -125,15 +125,14 @@ def predict_loop(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
 def predict_first_batch(predictor: AdjMatrPredictor, graph_data: GraphExtractionDG):
     metric_headers = ["tp", "tn", "fp", "fn", "precision", "recall", "f1"]
     logger = Logger(
-        f"adj_pred-k{predictor.k0}.csv",
+        f"adj_pred-batch-k{predictor.k0}.csv",
         headers=metric_headers,
         network=NetworkType.ADJ_MATR_NN,
     )
     predictor.logger = logger
 
-    combo_img, A_true, img = graph_data.get_single_data_point(4)
-
-    for i in range(5):
-        predictor._init_prediction(*combo_img)
-
-    predictor._adjacency_probs, predictor._adjacencies
+    for i in range(len(graph_data)):
+        combo_img, A_true, img = graph_data.get_single_data_point(i)
+        time = predictor.predict_batch(combo_img)
+        metrics = predictor.metrics(A_true[0].to_tensor())
+        logger.write(metrics, img_fp=img, num_nodes=predictor.num_nodes, time=time)

@@ -1,5 +1,7 @@
 from typing import Dict, List, Optional, Union
 
+import numpy as np
+
 from tools.NetworkType import NetworkType
 
 
@@ -37,12 +39,23 @@ class Logger:
 
         self._network = network
 
+        self.times = []
+
         self._init_file()
 
     def _init_file(self):
         with open(self._filename, "w") as f:
             data_str = self._data_string(self._log_headers)
             f.write(data_str)
+
+    def average_time(self, num_iters: int) -> float:
+        """Discard first time reading (made during tf tracing of function) and
+        averages the rest."""
+        assert len(self.times) == num_iters
+        t = np.mean(self.times[1:])
+        # reset
+        self.times = []
+        return t
 
     def write(
         self,
