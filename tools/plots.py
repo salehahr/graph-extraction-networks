@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import time
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import cv2
@@ -10,6 +11,7 @@ from matplotlib import pyplot as plt
 
 from tools.colours import BGR_GREEN
 from tools.data import pos_list_from_image
+from tools.files import create_folder
 from tools.image import classifier_preview, colour_enums, draw_circles, get_rgb
 from tools.NetworkType import NetworkType
 from tools.node_classifiers import NodeDegrees
@@ -398,10 +400,21 @@ def display_single_output(display_list: list, big_title: str):
 
 
 def _get_prediction_images(
-    model: tf.keras.models.Model, data_generator, batch: int = 0, id_in_batch: int = 0
+    model: tf.keras.models.Model,
+    data_generator,
+    batch: int = 0,
+    id_in_batch: int = 0,
+    with_time: bool = False,
+    with_filepath: bool = False,
 ):
-    input_images, masks = data_generator[batch]
-    pred_masks = model.predict(input_images)
+    input_images, masks, filepaths = data_generator[batch]
+    filepath = filepaths[id_in_batch].replace(" ", "").replace(":", "-")
+
+    num_iters = 3 if with_time else 1
+    for i in range(num_iters):
+        t_start = time()
+        pred_masks = model.predict(input_images)
+        t_elapsed = time() - t_start
 
     input_im = input_images[id_in_batch].numpy()
     input_im = lighten_skel_img(input_im)[:, :, :3]
@@ -418,7 +431,22 @@ def _get_prediction_images(
     }
     pred_imgs = classifier_preview(pred_output_matrices, input_im * 255)
 
-    return input_im, gt_imgs, pred_imgs
+    # # get predictions with misclassification(s)
+    # for attr, img in gt_output_matrices.items():
+    # if not np.array_equal(img, pred_output_matrices[attr]):
+    #     diff = img - pred_output_matrices[attr]
+    #     diff_idx = np.where(diff != 0)
+
+    if with_time:
+        if with_filepath:
+            return input_im, gt_imgs, pred_imgs, t_elapsed, filepath
+        else:
+            return input_im, gt_imgs, pred_imgs, t_elapsed
+    else:
+        if with_filepath:
+            return input_im, gt_imgs, pred_imgs, filepath
+        else:
+            return input_im, gt_imgs, pred_imgs
 
 
 def save_prediction_images(
@@ -428,20 +456,45 @@ def save_prediction_images(
     id_in_batch: int = 0,
     prefix: str = None,
 ):
-    input_image, gt_output_images, pred_output_images = _get_prediction_images(
-        model, data_generator, batch
+    (
+        input_image,
+        gt_output_images,
+        pred_output_images,
+        t_elapsed,
+        filepath,
+    ) = _get_prediction_images(
+        model, data_generator, batch, with_time=True, with_filepath=True
     )
+    print(f"t_elapsed {t_elapsed} s")
 
-    gt_prefix = f"data/b{batch}-{id_in_batch}"
-    pred_prefix = f"{prefix}-b{batch}-{id_in_batch}"
+    folder = f"data/nodesnn"
+    model_folder = f"{folder}/{prefix}"
+    batch_prefix = f"b{batch:03d}-{id_in_batch:04d}"
+    input_folder = f"{folder}/inputs"
 
+    # make folders if not existing
+    create_folder(input_folder)
+
+    for attr in gt_output_images.keys():
+        gt_folder = f"{folder}/{attr}"
+        pred_folder = f"{model_folder}/{attr}"
+
+        create_folder(gt_folder)
+        create_folder(pred_folder)
+
+    filename = f"{batch_prefix}-{filepath}.png"
+
+    # input
     input_image = (input_image * 255).astype(np.uint8)
-    cv2.imwrite(f"data/b{batch}-{id_in_batch}-input.png", input_image)
+    cv2.imwrite(f"{input_folder}/{filename}", input_image)
 
     for attr, img in gt_output_images.items():
-        cv2.imwrite(f"{gt_prefix}-gt-{attr}.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
         cv2.imwrite(
-            f"{pred_prefix}-pred-{attr}.png",
+            f"{folder}/{attr}/{filename}",
+            cv2.cvtColor(img, cv2.COLOR_RGB2BGR),
+        )
+        cv2.imwrite(
+            f"{model_folder}/{attr}/{filename}",
             cv2.cvtColor(pred_output_images[attr], cv2.COLOR_RGB2BGR),
         )
 

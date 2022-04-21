@@ -154,6 +154,7 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
         self.config = config
 
         if test_type == TestType.TRAINING:
+            self.get_filepath = False
             num_data = config.num_train
             if debug:
                 ds = data_op.get_debug_ds()
@@ -161,9 +162,11 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
                 ds = config.training_ds
 
         elif test_type == TestType.VALIDATION:
+            self.get_filepath = False
             num_data = config.num_validation
             ds = config.validation_ds
         elif test_type == TestType.TESTING:
+            self.get_filepath = True
             num_data = config.num_test
             ds = config.test_ds
         else:
@@ -296,13 +299,21 @@ class DataGenerator(tf.keras.utils.Sequence, ABC):
 class NodeExtractionDG(DataGenerator):
     def __getitem__(
         self, i: int
-    ) -> Tuple[tf.Tensor, Tuple[tf.Tensor, tf.Tensor, tf.Tensor]]:
+    ) -> Tuple[
+        tf.Tensor,
+        Tuple[tf.Tensor, tf.Tensor, tf.Tensor],
+        Tuple[tf.Tensor, tf.Tensor, tf.Tensor, List],
+    ]:
         """
         Returns the i-th batch.
         :param i: batch index
         :return: skeletonised images and node attributes of the images in the batch
         """
-        skel_imgs, node_pos, degrees, node_types, _ = self._get_data(i)
+        dg_data = self._get_data(i, return_fps=self.get_filepath)
+        if self.get_filepath:
+            skel_imgs, node_pos, degrees, node_types, _, filepaths = dg_data
+        else:
+            skel_imgs, node_pos, degrees, node_types, _ = dg_data
 
         # augment
         data = [skel_imgs, node_pos, degrees, node_types]
@@ -311,7 +322,15 @@ class NodeExtractionDG(DataGenerator):
         # rebatch
         skel_imgs, node_pos, degrees, node_types = self._rebatch(data)
 
-        return skel_imgs, (node_pos, degrees, node_types)
+        if not self.get_filepath:
+            return skel_imgs, (node_pos, degrees, node_types)
+        else:
+            ls_filepaths = data_op.ds_to_list(filepaths)
+            ls_filepaths = [
+                shorten_filepath(fp, data_path=self.config.data_path)
+                for fp in ls_filepaths
+            ]
+            return skel_imgs, (node_pos, degrees, node_types), ls_filepaths
 
 
 class GraphExtractionDG(DataGenerator):

@@ -34,3 +34,8 @@ def get_random_image(video_path):
     img_id = random.randint(1, len(img_list)) - 1
 
     return img_list[img_id]
+
+
+def create_folder(folder):
+    if not os.path.isdir(folder):
+        os.makedirs(folder)

@@ -46,9 +46,7 @@ if __name__ == "__main__":
 
         # visualise the predictions
         for batch_num in [0, 2, 5, 7]:
-            save_prediction_images(
-                model, test_data, batch=batch_num, prefix=f"data/{id_}"
-            )
+            save_prediction_images(model, test_data, batch=batch_num, prefix=id_)
 
         # metric evaluations
         run.evaluate(
