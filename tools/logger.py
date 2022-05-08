@@ -26,13 +26,15 @@ class Metrics:
 
 
 class Logger:
-    def __init__(self, filename: str, headers: List[str], network: NetworkType):
+    def __init__(
+        self, filename: str, headers: List[str], network: NetworkType, batch: bool
+    ):
         self._filename = filename
 
         self._delimiter = ","
         self._metric_headers = headers
 
-        if network == NetworkType.ADJ_MATR_NN:
+        if network == NetworkType.ADJ_MATR_NN or not batch:
             self._log_headers = ["img"] + headers + ["num_nodes", "time"]
         else:
             self._log_headers = ["batch"] + headers
@@ -59,7 +61,7 @@ class Logger:
 
     def write(
         self,
-        data: Dict[str, Union[str, int]],
+        data: Dict[str, Union[str, int, float]],
         batch: Optional[int] = None,
         img_fp: Optional[str] = None,
         num_nodes: Optional[int] = None,
@@ -71,7 +73,10 @@ class Logger:
             elif self._network == NetworkType.EDGE_NN:
                 data_str = self._data_to_str_edge(batch, data)
             elif self._network == NetworkType.NODES_NN:
-                data_str = self._data_to_str_nodes(batch, data)
+                if batch is None:
+                    data_str = self._data_to_str_adj_matr(img_fp, data, num_nodes, time)
+                else:
+                    data_str = self._data_to_str_nodes(batch, data)
             f.write(data_str)
 
     def _data_to_str_adj_matr(

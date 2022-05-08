@@ -20,12 +20,12 @@ if __name__ == "__main__":
         model_ids = ["5xo1nzt1", "3ee26r9o", "91pmt9xd"]
         metric_headers = [
             "loss",
-            "node_pos_loss",
-            "degrees_loss",
-            "node_types_loss",
-            "node_pos_accuracy",
-            "degrees_accuracy",
-            "node_types_accuracy",
+            "L_pos",
+            "L_degs",
+            "L_types",
+            "acc_pos",
+            "acc_degs",
+            "acc_types",
         ]
 
     # iterate over models
@@ -48,13 +48,22 @@ if __name__ == "__main__":
         for batch_num in [0, 2, 5, 7]:
             save_prediction_images(model, test_data, batch=batch_num, prefix=id_)
 
-        # metric evaluations
-        run.evaluate(
+        # metric evaluation per test image
+        run.evaluate_single(
             model,
             test_data,
             name=id_,
             metric_headers=metric_headers,
             network=network,
         )
+
+        # # metric evaluations over batches
+        # run.evaluate_batch(
+        #     model,
+        #     test_data,
+        #     name=id_,
+        #     metric_headers=metric_headers,
+        #     network=network,
+        # )
 
         del model

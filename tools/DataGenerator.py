@@ -29,6 +29,7 @@ def get_nedg(
     test: bool = False,
 ):
     if test:
+        config.batch_size = 1
         return NodeExtractionDG(
             config,
             config.network.node_extraction,
@@ -331,6 +332,14 @@ class NodeExtractionDG(DataGenerator):
                 for fp in ls_filepaths
             ]
             return skel_imgs, (node_pos, degrees, node_types), ls_filepaths
+
+    def get_single_data_point(self, i: int) -> Tuple[tf.Tensor, Tuple, str]:
+        """Returns data for a batch size of one,
+        with squeezed dimensions for convenience."""
+        assert self.batch_size == 1
+
+        skel_img, (node_pos, degrees, node_types), filepaths = self.__getitem__(i)
+        return skel_img, (node_pos, degrees, node_types), filepaths[0]
 
 
 class GraphExtractionDG(DataGenerator):

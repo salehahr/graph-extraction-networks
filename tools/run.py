@@ -12,6 +12,7 @@ from wandb.integration.keras import WandbCallback
 import wandb
 from model import EdgeNN, NodesNN
 from tools import Config, NetworkType, RunConfig
+from tools.evaluate import nodes_nn_metrics
 from tools.logger import Logger
 from tools.plots import plot_node_pairs_on_skel
 from tools.postprocessing import classify, smooth
@@ -346,9 +347,9 @@ def increment_step(step_num: int, id_in_batch: int, batch_size: int) -> Tuple[in
     return step_num, id_in_batch
 
 
-def evaluate(
-    model_: EdgeNN,
-    data: EdgeDG,
+def evaluate_single(
+    model_: Union[EdgeNN, NodesNN],
+    data: Union[EdgeDG, NodeExtractionDG],
     name: str,
     metric_headers: List[str],
     network: NetworkType,
@@ -358,6 +359,35 @@ def evaluate(
         f"{prefix}-{name}-{model_.num_trainable_params.numpy():d}.csv",
         headers=metric_headers,
         network=network,
+        batch=False,
+    )
+
+    for i in range(len(data)):
+        x, y_true, img = data.get_single_data_point(i)
+
+        # discard this run (tracing of graph)
+        model_.predict(x)
+
+        # use this run
+        pos_pred, deg_pred, types_pred, time = model_.predict(x, with_time=True)
+        num_nodes, metrics = nodes_nn_metrics(y_true, (pos_pred, deg_pred, types_pred))
+
+        logger.write(metrics, img_fp=img, num_nodes=num_nodes, time=time)
+
+
+def evaluate_batch(
+    model_: EdgeNN,
+    data: EdgeDG,
+    name: str,
+    metric_headers: List[str],
+    network: NetworkType,
+):
+    prefix = "batch_eval_edge" if network == NetworkType.EDGE_NN else "batch_eval_nodes"
+    logger = Logger(
+        f"{prefix}-{name}-{model_.num_trainable_params.numpy():d}.csv",
+        headers=metric_headers,
+        network=network,
+        batch=True,
     )
     model_.evaluate(
         data,

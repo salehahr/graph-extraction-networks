@@ -12,6 +12,7 @@ from model.utils import (
     pre_output_conv,
     single_conv,
 )
+from tools.timer import timer
 
 
 class UNet(tf.keras.models.Model):
@@ -116,6 +117,10 @@ class UNet(tf.keras.models.Model):
         return tf.keras.callbacks.TensorBoard(
             log_dir=filepath, histogram_freq=1, update_freq="epoch"
         )
+
+    @timer
+    def predict(self, *args, **kwargs) -> Dict[str, float]:
+        return super(UNet, self).predict(*args, **kwargs)
 
 
 class NodesNN(UNet):

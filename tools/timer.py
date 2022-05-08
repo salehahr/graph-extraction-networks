@@ -4,6 +4,8 @@ from time import time
 def timer(func):
     # noinspection PyUnreachableCode
     def wrapper_timer(*args, **kwargs):
+        with_time = kwargs.pop("with_time", None)
+
         t_start = time()
         fval = func(*args, **kwargs)
         t_end = time()
@@ -14,7 +16,7 @@ def timer(func):
             print(f"{func.__name__}:\t{func}\n\t{t_elapsed:.3f} s")
 
         # return elapsed time value or not
-        if kwargs.get("with_time"):
+        if with_time:
             return *fval, t_elapsed
         else:
             return fval
