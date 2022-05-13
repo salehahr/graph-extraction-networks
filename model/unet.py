@@ -33,7 +33,10 @@ class UNet(tf.keras.models.Model):
         self.skips = self._contractive_path(x, n_filters, depth)
 
         # expansive path
-        self.final_layer = self._expansive_path(self.skips, n_filters, depth)
+        if depth == 1:
+            self.final_layer = self.skips[0]
+        else:
+            self.final_layer = self._expansive_path(self.skips, n_filters, depth)
 
         # initialize Keras Model with defined above input and output layers
         super(UNet, self).__init__(inputs=x, outputs=self._get_outputs())
