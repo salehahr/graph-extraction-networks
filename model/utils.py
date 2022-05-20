@@ -40,11 +40,13 @@ def single_conv(
     n_filters: int,
     kernel_size: int,
     name: str,
-    activation: str,
-    padding: bool,
+    activation: Optional[str],
+    padding: Optional[bool],
     normalise: bool = True,
+    use_logits: bool = False,
 ):
     x = Conv2D(
+        name=name if use_logits is True else None,
         filters=n_filters,
         kernel_size=(kernel_size, kernel_size),
         padding="same" if padding is True else "valid",  # default keras
@@ -53,7 +55,10 @@ def single_conv(
     if normalise:
         x = BatchNormalization()(x)
 
-    return Activation(activation, name=name)(x)
+    if use_logits:
+        return x
+    else:
+        return Activation(activation, name=name)(x)
 
 
 # function that defines two sequential 2D convolutional layers with certain number of filters

@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 import tensorflow as tf
 
+from model.losses import WeightedCrossEntropy
 from model.utils import (
     deconv,
     double_conv,
@@ -178,7 +179,7 @@ class NodesNN(UNet):
         return {
             "node_pos": "binary_crossentropy",
             "degrees": "sparse_categorical_crossentropy",
-            "node_types": "sparse_categorical_crossentropy",
+            "node_types": WeightedCrossEntropy(n_classes=4),
         }
 
     def _define_metrics(self) -> Dict[str, List[tf.keras.metrics.Metric]]:
