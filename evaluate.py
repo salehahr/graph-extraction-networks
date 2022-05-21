@@ -58,6 +58,8 @@ if __name__ == "__main__":
         )
 
         # # metric evaluations over batches
+        # # deprecated, get_nedg with test=True option automatically sets batch size
+        # # to one.
         # run.evaluate_batch(
         #     model,
         #     test_data,

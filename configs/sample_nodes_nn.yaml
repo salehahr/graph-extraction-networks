@@ -1,0 +1,25 @@
+# wandb project/user
+project: node_extraction
+entity: salehah
+
+
+# wandb run details
+run_name: sample_name
+resume: true
+run_id: smnvgh0v      # or null to create new run
+run_type: training
+
+
+# model parameters
+parameters:
+  # training params
+  train_imgs: null    # max num. images to use, null to use all
+  epochs: 200
+  batch_size: 16
+  # model params
+  n_filters: 16
+  depth: 2
+
+
+# wandb sweep config
+sweep_config: null
