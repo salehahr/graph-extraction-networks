@@ -133,6 +133,7 @@ def load_model(
                 depth=params.depth,
                 pretrained_weights=run_config.pretrained_weights,
                 eager=eager,
+                use_class_weights=params.class_weights,
             )
         model_.build(run_eagerly=eager)
 

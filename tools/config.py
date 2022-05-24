@@ -171,6 +171,7 @@ class RunParams(BaseModel):
 
     # for NodesNN specifically
     depth: Optional[int] = None
+    class_weights: Optional[bool] = False
 
     # for EdgeNN specifically
     adjacency_frac: Optional[int] = None

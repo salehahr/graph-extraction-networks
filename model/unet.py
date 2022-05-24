@@ -135,10 +135,13 @@ class NodesNN(UNet):
         depth: int = 5,
         pretrained_weights=None,
         eager: bool = True,
+        use_class_weights: bool = False,
     ):
         self.node_pos = None
         self.degrees = None
         self.node_types = None
+
+        self._use_class_weights = use_class_weights
 
         super(NodesNN, self).__init__(
             input_size, n_filters, depth, pretrained_weights, eager
@@ -176,10 +179,15 @@ class NodesNN(UNet):
         return [self.node_pos, self.degrees, self.node_types]
 
     def _get_loss(self):
+        node_types_loss = (
+            WeightedCrossEntropy(n_classes=4)
+            if self._use_class_weights
+            else "sparse_categorical_crossentropy"
+        )
         return {
             "node_pos": "binary_crossentropy",
             "degrees": "sparse_categorical_crossentropy",
-            "node_types": WeightedCrossEntropy(n_classes=4),
+            "node_types": node_types_loss,
         }
 
     def _define_metrics(self) -> Dict[str, List[tf.keras.metrics.Metric]]:
