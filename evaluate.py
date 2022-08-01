@@ -17,7 +17,7 @@ if __name__ == "__main__":
         metric_headers = ["tp", "tn", "fp", "fn", "precision", "recall", "f1"]
     elif network == NetworkType.NODES_NN:
         test_data = get_nedg(data_config, test=True)
-        model_ids = ["5xo1nzt1", "3ee26r9o", "91pmt9xd"]
+        model_ids = ["2uircygo", "pqphq89g"]
         metric_headers = [
             "loss",
             "L_pos",
