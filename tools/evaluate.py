@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import tensorflow as tf
 
+from tools.DataGenerator import get_eedg, get_nedg
+from tools.NetworkType import NetworkType
 from tools.postprocessing import tf_classify
 
 if TYPE_CHECKING:
     from model import EdgeNN
+    from tools.config import Config, RunConfig
+    from tools.DataGenerator import EdgeDG, NodeExtractionDG
 
 
 def get_edgenn_caller(model: EdgeNN) -> tf.types.experimental.ConcreteFunction:
@@ -56,3 +60,23 @@ def nodes_nn_metrics(
         "acc_degs": float(acc_degs),
         "acc_types": float(acc_types),
     }
+
+
+def get_test_data(
+    network: NetworkType, data_config: Config, eval_config: RunConfig
+) -> Tuple[Union[EdgeDG, NodeExtractionDG], List[str]]:
+    if network == NetworkType.EDGE_NN:
+        test_data = get_eedg(data_config, eval_config, test=True)
+        metric_headers = ["tp", "tn", "fp", "fn", "precision", "recall", "f1"]
+    elif network == NetworkType.NODES_NN:
+        test_data = get_nedg(data_config, test=True)
+        metric_headers = [
+            "loss",
+            "L_pos",
+            "L_degs",
+            "L_types",
+            "acc_pos",
+            "acc_degs",
+            "acc_types",
+        ]
+    return test_data, metric_headers

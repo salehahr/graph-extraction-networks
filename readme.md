@@ -38,13 +38,20 @@ Current best model: 4f
     ```
 
 ### Testing
-1. Set network type to `NetworkType.NODES_NN` in [evaluate.py (L4)](./evaluate.py#L4).
-2. Set ID of model(s) to be tested in the list `model_ids` [(L20)](./evaluate.py#L20).
-3. Choose the type of evaluation to be done,
-    modifying the code and commeting out the other evaluation types:   
-    * Visualise batch predictions [(L47 - L49)](./evaluate.py#L47..L49)
-    * Evaluate metrics per test image [(L51 - L58)](./evaluate.py#L51..L58)
-4. Run [evaluate.py](./evaluate.py).
+1. Initialise variables:  
+    - Set network type to `NetworkType.NODES_NN` in [evaluate.py (L5)](./evaluate.py#L5).
+    - Populate `model_ids` list with the IDs of the model(s) to be tested in [evaluate.py (L6)](./evaluate.py#L6).
+    - Ensure that `eval_nodes_nn.yaml` is set in the second argument of `run.get_configs` in [evaluate.py (L11)](./evaluate.py#L11).
+3. Model configuration and weights — ensure that these files exist:  
+    * Model config yaml file in [configs](./configs/),
+        e.g.[sample_nodes_nn.yaml](./configs/sample_nodes_nn.yaml).
+    * Model weights in the path used in [evaluate.py (L21)](./evaluate.py#L21).  
+        Default path: `wandb/{model_id}.h5`.
+4. Choose the type of evaluation to be done,
+    modify/comment out what's not needed:   
+    * Visualise batch predictions [(L33 - L35)](./evaluate.py#L33..L35)
+    * Evaluate metrics per test image [(L37 - L44)](./evaluate.py#L37..L44)
+5. Run [evaluate.py](./evaluate.py).
 
 ## Edge Extraction
 Prediction of the existence of an edge
