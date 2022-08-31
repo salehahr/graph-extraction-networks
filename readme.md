@@ -1,4 +1,4 @@
-# tfgraph
+# graph-exraction-networks
 Extraction of graphs from skeletonised images.  
 A TensorFlow implementation.
 
@@ -20,10 +20,10 @@ using a model based on the U-Net.
 | ![](./img/node-positions.svg) | ![](./img/node-degrees.svg) | ![](./img/node-types.svg) |
 |           | 0, 1, 2, 3, 4| end, crossing, border |
 
-Current best model: 4f
-([wandb](https://wandb.ai/salehah/node_extraction/runs/91pmt9xd))
-([yaml](./configs/91pmt9xd.yaml))
-([h5](./wandb/91pmt9xd.h5))
+Current best model: b_16_d2 [id: pqphq89g]
+([wandb](https://wandb.ai/salehah/node_extraction/runs/pqphq89g))
+([yaml](./configs/pqphq89g.yaml))
+([h5](./wandb/pqphq89g.h5))
 
 ### Training
 1. Define configuration:
@@ -45,12 +45,12 @@ Current best model: 4f
 3. Model configuration and weights — ensure that these files exist:  
     * Model config yaml file in [configs](./configs/),
         e.g.[sample_nodes_nn.yaml](./configs/sample_nodes_nn.yaml).
-    * Model weights in the path used in [evaluate.py (L21)](./evaluate.py#L21).  
+    * Model weights in the path used in [evaluate.py (L19)](./evaluate.py#L19).  
         Default path: `wandb/{model_id}.h5`.
 4. Choose the type of evaluation to be done,
     modify/comment out what's not needed:   
-    * Visualise batch predictions [(L33 - L35)](./evaluate.py#L33..L35)
-    * Evaluate metrics per test image [(L37 - L44)](./evaluate.py#L37..L44)
+    * Visualise batch predictions [(L31 - L33)](./evaluate.py#L31..L33)
+    * Evaluate metrics per test image [(L35 - L41)](./evaluate.py#L35..L41)
 5. Run [evaluate.py](./evaluate.py).
 
 ## Edge Extraction

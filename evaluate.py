@@ -10,8 +10,6 @@ if __name__ == "__main__":
     data_config, eval_config = run.get_configs(
         "config.yaml", "configs/eval_nodes_nn.yaml"
     )
-
-    # define models to evaluate and headers
     test_data, metric_headers = get_test_data(network, data_config, eval_config)
 
     # iterate over models
