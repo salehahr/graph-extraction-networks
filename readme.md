@@ -1,9 +1,14 @@
-# graph-exraction-networks
-Extraction of graphs from skeletonised images.  
-A TensorFlow implementation.
+<h1 align=center>graph-extraction-networks</h1>
 
-![](./img/graph-extraction-dark.svg#gh-dark-mode-only)
-![](./img/graph-extraction-light.svg#gh-light-mode-only)
+<p align=center>
+Extraction of graphs from skeletonised images — a TensorFlow implementation.
+
+<img src="./img/graph-extraction-dark.svg#gh-dark-mode-only">
+<img src="./img/graph-extraction-light.svg#gh-light-mode-only">
+</p>
+
+-----
+**Related**: [data generation](https://github.com/salehahr/graph-extraction-datagen), [sample GUI implementation](https://github.com/salehahr/graph-extraction-gui)
 
 The graph extraction consists of a 
 **[node extraction](#node-extraction)** part,
